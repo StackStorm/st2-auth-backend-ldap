@@ -58,7 +58,7 @@ setup(
     test_suite='tests',
     entry_points={
         'st2auth.backends.backend': [
-            'ldap = st2auth_ldap_backend.ldap:LDAPAuthenticationBackend',
+            'ldap = st2auth_ldap_backend.ldap_backend:LDAPAuthenticationBackend',
         ],
     },
     zip_safe=False
