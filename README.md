@@ -8,6 +8,10 @@ credentials and authenticates user against an LDAP server.
 For information on how to install and configure this backend, please see the official
 documentation - http://docs.stackstorm.com/config/authentication.html#ldap-backend
 
+Note: This backend was originally contributed to st2 repo by [Ruslan Tumarkin](
+https://github.com/ruslantum)
+(https://github.com/StackStorm/st2/pull/1790).
+
 ## Copyright, License, and Contributors Agreement
 
 Copyright 2015 StackStorm, Inc.
