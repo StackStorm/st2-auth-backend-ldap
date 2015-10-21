@@ -1,16 +1,42 @@
-# LDAP StackStorm Authentication Backend
+# LDAP authentication plugin for StackStorm Community edition
 
 [![Build Status](https://api.travis-ci.org/StackStorm/st2-auth-backend-ldap.svg?branch=master)](https://travis-ci.org/StackStorm/st2-auth-backend-ldap) [![IRC](https://img.shields.io/irc/%23stackstorm.png)](http://webchat.freenode.net/?channels=stackstorm)
 
-This repository contains LDAP StackStorm authentication backend. This backend reads
-credentials and authenticates user against an LDAP server.
+The LDAP backend reads credentials and authenticates user against an LDAP server. This backend
+was originally contributed to st2 repo by [Ruslan Tumarkin](https://github.com/ruslantum) under 
+[PR #1790](https://github.com/StackStorm/st2/pull/1790).
 
-For information on how to install and configure this backend, please see the official
-documentation - http://docs.stackstorm.com/config/authentication.html#ldap-backend
+### Configuration Options
 
-Note: This backend was originally contributed to st2 repo by [Ruslan Tumarkin](
-https://github.com/ruslantum)
-(https://github.com/StackStorm/st2/pull/1790).
+| option        | required | default | description                                                |
+|---------------|----------|---------|------------------------------------------------------------|
+| ldap_server   | yes      |         | URL of the LDAP server                                     |
+| base_dn       | yes      |         | Base DN on the LDAP server                                 |
+| group_dn      | yes      |         | Group DN in which the user is a member                     |
+| scope         | yes      | subtree | Scope search parameter: base, onelevel or subtree          |
+| use_tls       | yes      |         | Boolean parameter to set if tls is required                |
+| search_filter | yes      |         | Filter that should contain the placeholder %(username)s    |
+
+### Configuration Example
+
+Please refer to the authentication section in the StackStorm
+[documentation](http://docs.stackstorm.com) for basic setup concept. The
+following is an example of the auth section in the StackStorm configuration file for the flat-file
+backend.
+
+```
+[auth]
+mode = standalone
+backend = ldap
+backend_kwargs = {"ldap_server": "ldap://identity.example.com:389", "base_dn": "ou=users,dc=example,dc=com", "group_dn": "ou=devops,ou=groups,dc=example,dc=com", "scope": "subtree", "use_tls": true, "search_filter": ""}
+enable = True
+use_ssl = True
+cert = /path/to/ssl/cert/file
+key = /path/to/ssl/key/file
+logging = /path/to/st2auth.logging.conf
+api_url = https://myhost.example.com:9101
+debug = False
+```
 
 ## Copyright, License, and Contributors Agreement
 
