@@ -3,8 +3,22 @@
 [![Build Status](https://api.travis-ci.org/StackStorm/st2-auth-backend-ldap.svg?branch=master)](https://travis-ci.org/StackStorm/st2-auth-backend-ldap) [![IRC](https://img.shields.io/irc/%23stackstorm.png)](http://webchat.freenode.net/?channels=stackstorm)
 
 The LDAP backend reads credentials and authenticates user against an LDAP server. This backend
-was originally contributed to st2 repo by [Ruslan Tumarkin](https://github.com/ruslantum) under 
+was originally contributed to st2 repo by [Ruslan Tumarkin](https://github.com/ruslantum) under
 [PR #1790](https://github.com/StackStorm/st2/pull/1790).
+
+Note:
+
+Currently there are two types of LDAP backends available - community contributed one and one
+developed and maintained by the StackStorm team. This repository contains a community contributed
+one.
+
+Community contributed backend can be installed by anyone and the StackStorm developed one is only
+available in the enterprise edition (for more information on the enterprise edition, please see
+https://stackstorm.com/product/#enterprise).
+
+The difference between them is that the one included in the enterprise edition is developed,
+supported, tested, maintained and certified by the StackStorm team and the community contributed
+one is developed and maintained by the community.
 
 ### Configuration Options
 
