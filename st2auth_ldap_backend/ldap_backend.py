@@ -38,38 +38,23 @@ class LDAPAuthenticationBackend(object):
     If the user is in the group, he will be authenticated.
     """
 
-    def __init__(self, ldap_server, domain, scope, use_tls, search_filter):
+    def __init__(self, ldap_server, domain, use_tls):
         """
         :param ldap_server: URL of the LDAP Server
         :type ldap_server: ``str``
         :param domain: User email domain
         :type domain: ``str``
-        :param scope: Scope search parameter. Can be base, onelevel or subtree (default: subtree)
-        :type scope: ``str``
         :param use_tls: Boolean parameter to set if tls is required
         :type use_tls: ``bool``
-        :param search_filter: Should contain the placeholder %(username)s for the username
-        :type use_tls: ``str``
         """
         self._ldap_server = ldap_server
         self._domain = domain
-        if "base" in scope:
-            self._scope = ldap.SCOPE_BASE
-        elif "onelevel" in scope:
-            self._scope = ldap.SCOPE_ONELEVEL
-        else:
-            self._scope = ldap.SCOPE_SUBTREE
         if use_tls != "True" or "ldaps" in ldap_server:
             self._use_tls = False
         else:
             self._use_tls = True
-        self._search_filter = search_filter
 
     def authenticate(self, username, password):
-        if self._search_filter:
-            search_filter = self._search_filter % {'username': username}
-        else:
-            search_filter = 'sAMAccountName={}'.format(username)
         try:
             ldap.set_option(ldap.OPT_X_TLS_REQUIRE_CERT, ldap.OPT_X_TLS_NEVER)
             connect = ldap.initialize(self._ldap_server)
@@ -83,12 +68,14 @@ class LDAPAuthenticationBackend(object):
                 LOG.debug('Authentication for user "{}" successful'.format(username))
                 return True
             except ldap.LDAPError as e:
-                LOG.debug('Authentication for user "{0}" failed. LDAP Error: {1}'.format(username, str(e)))
+                LOG.debug('Authentication for user "{0}" failed. \
+                    LDAP Error: {1}'.format(username, str(e)))
                 return False
             finally:
                 connect.unbind()
         except ldap.LDAPError as e:
-            LOG.debug('Authentication for user "{0}" failed. LDAP Error: {1}'.format(username, str(e)))
+            LOG.debug('Authentication for user "{0}" failed. \
+                LDAP Error: {1}'.format(username, str(e)))
             return False
 
     def get_user(self, username):
