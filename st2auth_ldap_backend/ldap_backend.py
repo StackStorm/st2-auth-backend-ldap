@@ -38,41 +38,23 @@ class LDAPAuthenticationBackend(object):
     If the user is in the group, he will be authenticated.
     """
 
-    def __init__(self, ldap_server, base_dn, group_dn, scope, use_tls, search_filter):
+    def __init__(self, ldap_server, domain, use_tls):
         """
         :param ldap_server: URL of the LDAP Server
         :type ldap_server: ``str``
-        :param base_dn: Base DN on the LDAP Server
-        :type base_dn: ``str``
-        :param group_dn: Group DN on the LDAP Server which contains the user as member
-        :type group_dn: ``str``
-        :param scope: Scope search parameter. Can be base, onelevel or subtree (default: subtree)
-        :type scope: ``str``
+        :param domain: User email domain
+        :type domain: ``str``
         :param use_tls: Boolean parameter to set if tls is required
         :type use_tls: ``bool``
-        :param search_filter: Should contain the placeholder %(username)s for the username
-        :type use_tls: ``str``
         """
         self._ldap_server = ldap_server
-        self._base_dn = base_dn
-        self._group_dn = group_dn
-        if "base" in scope:
-            self._scope = ldap.SCOPE_BASE
-        elif "onelevel" in scope:
-            self._scope = ldap.SCOPE_ONELEVEL
-        else:
-            self._scope = ldap.SCOPE_SUBTREE
+        self._domain = domain
         if use_tls != "True" or "ldaps" in ldap_server:
             self._use_tls = False
         else:
             self._use_tls = True
-        self._search_filter = search_filter
 
     def authenticate(self, username, password):
-        if self._search_filter:
-            search_filter = self._search_filter % {'username': username}
-        else:
-            search_filter = 'uniqueMember=uid=' + username + ',' + self._base_dn
         try:
             ldap.set_option(ldap.OPT_X_TLS_REQUIRE_CERT, ldap.OPT_X_TLS_NEVER)
             connect = ldap.initialize(self._ldap_server)
@@ -81,21 +63,19 @@ class LDAPAuthenticationBackend(object):
                 connect.set_option(ldap.OPT_X_TLS, ldap.OPT_X_TLS_DEMAND)
                 connect.start_tls_s()
                 LOG.debug('using TLS')
-            connect.simple_bind_s("uid=" + username + "," + self._base_dn, password)
             try:
-                result = connect.search_s(self._group_dn, self._scope, search_filter)
-                if result is None:
-                    LOG.debug('User "%s" doesn\'t exist in group "%s"' % (username, self._group_dn))
-                elif result:
-                    LOG.debug('Authentication for user "%s" successful' % (username))
-                    return True
-                return False
-            except:
+                connect.simple_bind_s('{0}@{1}'.format(username, self._domain), password)
+                LOG.debug('Authentication for user "{}" successful'.format(username))
+                return True
+            except ldap.LDAPError as e:
+                LOG.debug('Authentication for user "{0}" failed. \
+                    LDAP Error: {1}'.format(username, str(e)))
                 return False
             finally:
                 connect.unbind()
         except ldap.LDAPError as e:
-            LOG.debug('LDAP Error: %s' % (str(e)))
+            LOG.debug('Authentication for user "{0}" failed. \
+                LDAP Error: {1}'.format(username, str(e)))
             return False
 
     def get_user(self, username):
