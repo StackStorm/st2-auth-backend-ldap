@@ -20,6 +20,12 @@ The difference between them is that the one included in the enterprise edition i
 supported, tested, maintained and certified by the StackStorm team and the community contributed
 one is developed and maintained by the community.
 
+### Dependencies
+
+```
+yum install openldap-devel -y
+```
+
 ### Configuration Options
 
 | option        | required | default | description                                                |
