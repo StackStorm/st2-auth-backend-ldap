@@ -32,9 +32,7 @@ yum install openldap-devel -y
 |---------------|----------|---------|------------------------------------------------------------|
 | ldap_server   | yes      |         | URL of the LDAP server                                     |
 | domain        | yes      |         | Users' email domain                                        |
-| scope         | yes      | subtree | Scope search parameter: base, onelevel or subtree          |
 | use_tls       | yes      |         | Boolean parameter to set if tls is required                |
-| search_filter | yes      |         | Filter that should contain the placeholder %(username)s    |
 
 ### Configuration Example
 
@@ -47,7 +45,7 @@ backend.
 [auth]
 mode = standalone
 backend = ldap
-backend_kwargs = {"ldap_server": "ldap://identity.example.com:389", "domain": "stackstorm.com", "scope": "subtree", "use_tls": true, "search_filter": "sAMAccountName=%(username)s"}
+backend_kwargs = {"ldap_server": "ldap://identity.example.com:389", "domain": "stackstorm.com", "use_tls": true}
 enable = True
 use_ssl = True
 cert = /path/to/ssl/cert/file
