@@ -25,7 +25,7 @@ one is developed and maintained by the community.
 | option        | required | default | description                                                |
 |---------------|----------|---------|------------------------------------------------------------|
 | ldap_server   | yes      |         | URL of the LDAP server                                     |
-| domain        | yes      |         | User's emain domain                                        |
+| domain        | yes      |         | Users' email domain                                        |
 | scope         | yes      | subtree | Scope search parameter: base, onelevel or subtree          |
 | use_tls       | yes      |         | Boolean parameter to set if tls is required                |
 | search_filter | yes      |         | Filter that should contain the placeholder %(username)s    |
