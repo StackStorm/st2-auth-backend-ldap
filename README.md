@@ -92,13 +92,25 @@ The procedure mentioned here is suitable for development environments and may no
 
  1. Activate the stackstorm virtual environment.
  ```source /<path to stackstorm>/st2/bin/activate```
- 2. Install the LDAP plugin and its dependencies.
+ 2. pip upgrade to latest version of pip
+ ```pip install --update pip```
+ 3. install dev packages for ldap (optional for development)
+ ```apt-get install libsasl2-dev python-dev libldap2-dev libssl-dev```
+ 4. Install the LDAP plugin and its dependencies.
  ```pip install git+https://github.com/<github_account>/st2-auth-backend-ldap.git@master#egg=st2_auth_backend_ldap```
- 3. Deactivate virtual environment.
-```deactivate```
- 4. Configure the authentication backend in `/etc/st2/st2.conf` (see example above).
- 5. Restart Stackstorm
+ 5. Deactivate virtual environment.
+ ```deactivate```
+ 6. Configure the authentication backend in `/etc/st2/st2.conf` (see example above).
+ 7. Restart Stackstorm
  ```st2ctl restart```
+
+Watch out for configuration errors in st2.conf, the auth daemon will silently fail to start if it encounters any errors.
+
+Confirm you can get access with the required information:
+```
+  apt-get install ldap-utils
+  ldapsearch ....
+```
 
 
 ## Copyright, License, and Contributors Agreement
@@ -112,4 +124,3 @@ or at: [http://www.apache.org/licenses/LICENSE-2.0](http://www.apache.org/licens
 By contributing you agree that these contributions are your own (or approved by your employer) and
 you grant a full, complete, irrevocable copyright license to all users and developers of the
 project, present and future, pursuant to the license of the project.
-
