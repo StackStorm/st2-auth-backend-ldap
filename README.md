@@ -95,27 +95,19 @@ This authentication backend attempts to be flexible with the way LDAP binding an
 
 #### ActiveDirectory Examples
 
-Using `sAMAccountName` should be unique in combination with a domain name.<br />
-```
-"bind_dn": "sAMAccountName={username}@example.com", "bind_pw": "{password}"
-```
+Using `sAMAccountName` should be unique in combination with a domain name.
+`"bind_dn": "sAMAccountName={username}@example.com", "bind_pw": "{password}"`
 
-Using `userPrincipalName` should be unique within a forest.<br />
-```
-"bind_dn": "userPrincipalName={username}", "bind_pw": "{password}"
-```
+Using `userPrincipalName` should be unique within a forest.
+`"bind_dn": "userPrincipalName={username}", "bind_pw": "{password}"`
 
 #### OpenLDAP Examples
 
 Using anonymous binding
-```
-"bind_dn": "", "bind_pw": ""
-```
+`"bind_dn": "", "bind_pw": ""`
 
 Using bind DN
-```
-"bind_dn": "cn=bind_user,dc=example,dc=com", "bind_pw": "bind_user_password"
-```
+`"bind_dn": "cn=bind_user,dc=example,dc=com", "bind_pw": "bind_user_password"`
 
 
 ### Installation
@@ -123,26 +115,24 @@ Using bind DN
 The procedure mentioned here is suitable for development environments and may not be ideal under production conditions.
 
  1. Activate the stackstorm virtual environment.
- ```source /<path to stackstorm>/st2/bin/activate```
- 2. pip upgrade to latest version of pip
- ```pip install --update pip```
- 3. install dev packages for ldap (optional for development)
- ```apt-get install libsasl2-dev python-dev libldap2-dev libssl-dev```
+ `source /<path to stackstorm>/st2/bin/activate`
+ 2. Upgrade pip to the latest version.
+ `pip install --update pip`
+ 3. Optionally, install dev packages for ldap
+ `apt-get install libsasl2-dev python-dev libldap2-dev libssl-dev`
  4. Install the LDAP plugin and its dependencies.
- ```pip install git+https://github.com/<github_account>/st2-auth-backend-ldap.git@master#egg=st2_auth_backend_ldap```
+ `pip install git+https://github.com/<github_account>/st2-auth-backend-ldap.git@master#egg=st2_auth_backend_ldap`
  5. Deactivate virtual environment.
- ```deactivate```
+ `deactivate`
  6. Configure the authentication backend in `/etc/st2/st2.conf` (see example above).
  7. Restart Stackstorm
- ```st2ctl restart```
+ `st2ctl restart`
 
 Watch out for configuration errors in st2.conf, the auth daemon will silently fail to start if it encounters any errors.
 
 Confirm you can get access with the required information:
-```
-  apt-get install ldap-utils
-  ldapsearch ....
-```
+`  apt-get install ldap-utils
+  ldapsearch ....`
 
 
 ## Copyright, License, and Contributors Agreement
