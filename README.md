@@ -41,8 +41,7 @@ The difference between them is that the one included in the enterprise edition i
 
 Please refer to the authentication section in the StackStorm [documentation](http://docs.stackstorm.com) for basic setup concept. The following is an example of the auth section in the StackStorm configuration file for the ldap backend.
 
-```
-[auth]
+`[auth]
 mode = standalone
 backend = ldap
 backend_kwargs = { "ldap_uri": "ldap://ldap.example.com", "use_tls": true, "bind_dn": "cn=user,dc=example,dc=com", "bind_pw": "bind_password", "user": {"base_dn": "ou=users,dc=example,dc=com", "search_filter": "(uid={username})", "scope": "onelevel"}, "group": {"base_dn": "ou=groups,dc=example,dc=com", "search_filter": "(&(cn=st2access)(memberUid={username}))", "scope": "subtree"} }
@@ -53,7 +52,40 @@ key = /path/to/ssl/key/file
 logging = /path/to/st2auth.logging.conf
 api_url = https://myhost.example.com:9101
 debug = False
-```
+`
+
+### Authenticating users against alternative schemas.
+
+There is no one standard way to store user credentials in LDAP.  There are various ways to organise the directory tree and various ways to secure it.  In some cases, the users DN can't be determined with a static configuration and requires a bind DN to locate the user in the database before user authentication can occur.
+
+This authentication backend attempts to be flexible with the way LDAP binding and authentication can be performed, but may not meet all uses cases.
+
+#### ActiveDirectory Examples
+
+Using `sAMAccountName` should be unique in combination with a domain name.<br />
+`"user_dn": "sAMAccountName={{username}}@example.com"`
+
+Using `userPrincipalName` should be unique within a forest.<br />
+`"user_dn": "userPrincipalName={{username}}"`
+
+#### OpenLDAP
+Match unique users in a posix group
+`"uniqueMember=uid=`
+
+### Installation
+
+The procedure mentioned here is suitable for development environments and not recommended for production.
+
+ 1. Activate the stackstorm virtual environment.
+ `source /<path to stackstorm>/st2/bin/activate`
+ 2. Install the LDAP plugin and it's dependencies.
+ `pip install git+https://github.com/StackStorm/st2-auth-backend-ldap.git@master#egg=st2_auth_backend_ldap`
+ 3. Deactivate virtual environment.
+ `deactivate`
+ 4. Configure the authentication backend in `/etc/st2/st2.conf` (see example above).
+ 5. Restart Stackstorm
+ `st2ctl restart`
+
 
 ### Authenticating users against various schemas.
 

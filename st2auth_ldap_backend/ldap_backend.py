@@ -18,24 +18,18 @@
 # pylint: disable=no-member
 
 from __future__ import absolute_import
-
-import logging
-
 import ldap
+import logging
+LOG = logging.getLogger(__name__)
 
 __all__ = [
     'LDAPAuthenticationBackend'
 ]
 
 
-LOG = logging.getLogger(__name__)
-
-
-
 class LDAPAuthenticationBackend(object):
     """
     Backend which reads authentication information from a ldap server.
-
     Supported authentication methods:
         * Anonymous session with user lookup.
         * Bind Distinguish Name with user lookup.
@@ -77,6 +71,7 @@ class LDAPAuthenticationBackend(object):
         return opt
 
 
+
     def authenticate(self, username, password):
         """
         Simple binding to authenticate username/password against the LDAP server.
@@ -88,7 +83,6 @@ class LDAPAuthenticationBackend(object):
         connection = self._ldap_connect()
         if not connection:
             return False
-
         try:
             if self._bind_dn == '' == self._bind_pw:
                 LOG.debug("Attempting to fast bind anonymously.")
