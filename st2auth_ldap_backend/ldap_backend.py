@@ -26,6 +26,7 @@ __all__ = [
     'LDAPAuthenticationBackend'
 ]
 
+
 class LDAPAuthenticationBackend(object):
     """
     Backend which reads authentication information from a ldap server.
@@ -37,17 +38,19 @@ class LDAPAuthenticationBackend(object):
     def __init__(self, ldap_uri, use_tls=False, bind_dn='', bind_pw='', user=None, group=None):
         """
         :param ldap_uri: URL of the LDAP Server. <proto>://<host>[:port]
-        :type ldap_uri: ``str``
-        :param use_tls: Boolean parameter to set if tls is required.
-        :type use_tls: ``bool``
-        :param bind_dn: The Distinguish Name account to bind to the ldap server.
-        :type bind_dn: ``str``
-        :param bind_pw: The Distinguish Name account's password.
-        :type bind_pw: ``str``
-        :param user: Search parameters used to authenticate the user.  (base_dn, search_filter, scope)
-        :type user: ``dict``
-        :param group: Search parameters used to confirm the user is a member of a given group.  (base_dn, search_filter, scope)
-        :type group: ``dict``
+        :type ldap_uri:  ``str``
+        :param use_tls:  Boolean parameter to set if tls is required.
+        :type use_tls:   ``bool``
+        :param bind_dn:  The Distinguish Name account to bind to the ldap server.
+        :type bind_dn:   ``str``
+        :param bind_pw:  The Distinguish Name account's password.
+        :type bind_pw:   ``str``
+        :param user:     Search parameters used to authenticate the user.
+                         (base_dn, search_filter, scope)
+        :type user:      ``dict``
+        :param group:    Search parameters used to confirm the user is a member of a given group.
+                         (base_dn, search_filter, scope)
+        :type group:     ``dict``
         """
         self._ldap_uri = ldap_uri
         self._use_tls = use_tls
@@ -55,7 +58,6 @@ class LDAPAuthenticationBackend(object):
         self._bind_pw = bind_pw
         self._user = user
         self._group = group
-
 
     def _scope_to_ldap_option(self, scope):
         """
@@ -68,8 +70,6 @@ class LDAPAuthenticationBackend(object):
         else:
             opt = ldap.SCOPE_SUBTREE
         return opt
-
-
 
     def authenticate(self, username, password):
         """
@@ -130,7 +130,6 @@ class LDAPAuthenticationBackend(object):
             LOG.debug('LDAP connection closed')
         return True
 
-
     def _ldap_connect(self):
         """
         Prepare ldap object for binding phase.
@@ -150,7 +149,6 @@ class LDAPAuthenticationBackend(object):
             LOG.debug('(_ldap_connect) LDAP Error: %s : Type %s' % (str(e), type(e)))
             return False
 
-
     def _ldap_search(self, connection, username, criteria):
         """
         Perform a search against the LDAP server using an established connection.
@@ -158,7 +156,8 @@ class LDAPAuthenticationBackend(object):
         :type connection: ``LDAPobject``
         :param username: The username to be used in the search filter.
         :type username: ``str``
-        :param criteria: A dictionary of search filter parameters. (base_dn, search_filter, scope, pattern)
+        :param criteria: A dictionary of search filter parameters.
+                         (base_dn, search_filter, scope, pattern)
         :type criteria: ``dict``
         """
         base_dn = criteria['base_dn']
@@ -170,7 +169,6 @@ class LDAPAuthenticationBackend(object):
         # Disabled to prevent logging sensitive data.
         # LOG.debug("RESULT: {}".format(result))
         return result
-
 
     def get_user(self, username):
         pass
