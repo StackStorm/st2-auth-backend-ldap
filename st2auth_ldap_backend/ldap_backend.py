@@ -26,7 +26,6 @@ __all__ = [
     'LDAPAuthenticationBackend'
 ]
 
-
 class LDAPAuthenticationBackend(object):
     """
     Backend which reads authentication information from a ldap server.
@@ -62,9 +61,9 @@ class LDAPAuthenticationBackend(object):
         """
         Transform scope string into ldap module constant.
         """
-        if "base" in scope.lower():
+        if 'base' in scope.lower():
             opt = ldap.SCOPE_BASE
-        elif "onelevel" in scope.lower():
+        elif 'onelevel' in scope.lower():
             opt = ldap.SCOPE_ONELEVEL
         else:
             opt = ldap.SCOPE_SUBTREE
@@ -85,50 +84,50 @@ class LDAPAuthenticationBackend(object):
             return False
         try:
             if self._bind_dn == '' == self._bind_pw:
-                LOG.debug("Attempting to fast bind anonymously.")
+                LOG.debug('Attempting to fast bind anonymously.')
                 connection.simple_bind_s()
-                LOG.debug("Connected to LDAP as %s " % connection.whoami_s())
+                LOG.debug('Connected to LDAP as %s ' % connection.whoami_s())
             else:
-                LOG.debug("Attempting to fast bind with DN.")
+                LOG.debug('Attempting to fast bind with DN.')
                 if self._bind_dn.find('{username}') != -1:
                     self._bind_dn = self._bind_dn.format(username=username)
                 if self._bind_pw.find('{password}') != -1:
                     self._bind_pw = self._bind_pw.format(password=password)
 
                 connection.simple_bind_s(self._bind_dn, self._bind_pw)
-                LOG.debug("Connected to LDAP as %s " % connection.whoami_s())
+                LOG.debug('Connected to LDAP as %s ' % connection.whoami_s())
 
             if self._user:
                 # Authenticate username and password.
                 result = self._ldap_search(connection, username, self._user)
                 if len(result) != 1:
-                    LOG.debug("Failed to uniquely identify the user.")
+                    LOG.debug('Failed to uniquely identify the user.')
                     return False
                 user_dn = result[0][0]
-                LOG.debug("DN identified as : %s" % user_dn)
+                LOG.debug('DN identified as : %s' % user_dn)
                 try:
                     user_connection = self._ldap_connect()
                     user_connection.simple_bind_s(user_dn, password)
+                    LOG.debug('User successfully authenticated as %s ' % connection.whoami_s())
                 except ldap.LDAPError as e:
                     LOG.debug('LDAP Error: %s' % (str(e)))
                     return False
                 finally:
                     user_connection.unbind()
-                LOG.debug("User successfully authenticated as %s " % connection.whoami_s())
 
             if self._group:
                 # Confirm the user is a member of a given group.
                 result = self._ldap_search(connection, username, self._group)
                 if len(result) != 1:
-                    LOG.debug("Unable to find %s in the group." % username)
+                    LOG.debug('Unable to find %s in the group.' % username)
                     return False
 
         except ldap.LDAPError as e:
-            LOG.debug('LDAP Error: %s' % (str(e)))
+            LOG.debug('(authenticate) LDAP Error: %s : Type %s' % (str(e), type(e)))
             return False
         finally:
             connection.unbind()
-            LOG.debug("LDAP connection closed")
+            LOG.debug('LDAP connection closed')
         return True
 
 
@@ -148,7 +147,7 @@ class LDAPAuthenticationBackend(object):
                 LOG.debug('Connection now using TLS')
             return connection
         except ldap.LDAPError as e:
-            LOG.debug('LDAP Error: %s' % (str(e)))
+            LOG.debug('(_ldap_connect) LDAP Error: %s : Type %s' % (str(e), type(e)))
             return False
 
 
@@ -162,14 +161,14 @@ class LDAPAuthenticationBackend(object):
         :param criteria: A dictionary of search filter parameters. (base_dn, search_filter, scope, pattern)
         :type criteria: ``dict``
         """
-        base_dn = criteria["base_dn"]
-        search_filter = criteria["search_filter"].format(username=username)
-        scope = self._scope_to_ldap_option(criteria["scope"])
+        base_dn = criteria['base_dn']
+        search_filter = criteria['search_filter'].format(username=username)
+        scope = self._scope_to_ldap_option(criteria['scope'])
 
-        LOG.debug("Searching ... %s %s %s" % (base_dn, scope, search_filter))
-        result = connection.search_st(base_dn, scope, search_filter, timeout=10)
+        LOG.debug('Searching ... %s %s %s' % (base_dn, scope, search_filter))
+        result = connection.search_s(base_dn, scope, search_filter)
         # Disabled to prevent logging sensitive data.
-        #LOG.debug("RESULT: %s" % result)
+        # LOG.debug("RESULT: {}".format(result))
         return result
 
 
