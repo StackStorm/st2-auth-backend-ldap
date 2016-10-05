@@ -18,85 +18,157 @@
 # pylint: disable=no-member
 
 from __future__ import absolute_import
-
-import logging
-
 import ldap
+import logging
+LOG = logging.getLogger(__name__)
 
 __all__ = [
     'LDAPAuthenticationBackend'
 ]
 
-LOG = logging.getLogger(__name__)
-
 
 class LDAPAuthenticationBackend(object):
     """
     Backend which reads authentication information from a ldap server.
-    The backend tries to bind the ldap user with given username and password.
-    If the bind was successful, it tries to find the user in the given group.
-    If the user is in the group, he will be authenticated.
+    Supported authentication methods:
+        * Anonymous session with user lookup.
+        * Bind Distinguish Name with user lookup.
+        * Bind Distinguish Name with user and group lookup.
     """
+    def __init__(self, ldap_uri, use_tls=False, bind_dn='', bind_pw='', user=None, group=None):
+        """
+        :param ldap_uri: URL of the LDAP Server. <proto>://<host>[:port]
+        :type ldap_uri:  ``str``
+        :param use_tls:  Boolean parameter to set if tls is required.
+        :type use_tls:   ``bool``
+        :param bind_dn:  The Distinguish Name account to bind to the ldap server.
+        :type bind_dn:   ``str``
+        :param bind_pw:  The Distinguish Name account's password.
+        :type bind_pw:   ``str``
+        :param user:     Search parameters used to authenticate the user.
+                         (base_dn, search_filter, scope)
+        :type user:      ``dict``
+        :param group:    Search parameters used to confirm the user is a member of a given group.
+                         (base_dn, search_filter, scope)
+        :type group:     ``dict``
+        """
+        self._ldap_uri = ldap_uri
+        self._use_tls = use_tls
+        self._bind_dn = bind_dn
+        self._bind_pw = bind_pw
+        self._user = user
+        self._group = group
 
-    def __init__(self, ldap_server, base_dn, group_dn, scope, use_tls, search_filter):
+    def _scope_to_ldap_option(self, scope):
         """
-        :param ldap_server: URL of the LDAP Server
-        :type ldap_server: ``str``
-        :param base_dn: Base DN on the LDAP Server
-        :type base_dn: ``str``
-        :param group_dn: Group DN on the LDAP Server which contains the user as member
-        :type group_dn: ``str``
-        :param scope: Scope search parameter. Can be base, onelevel or subtree (default: subtree)
-        :type scope: ``str``
-        :param use_tls: Boolean parameter to set if tls is required
-        :type use_tls: ``bool``
-        :param search_filter: Should contain the placeholder %(username)s for the username
-        :type use_tls: ``str``
+        Transform scope string into ldap module constant.
         """
-        self._ldap_server = ldap_server
-        self._base_dn = base_dn
-        self._group_dn = group_dn
-        if "base" in scope:
-            self._scope = ldap.SCOPE_BASE
-        elif "onelevel" in scope:
-            self._scope = ldap.SCOPE_ONELEVEL
+        if 'base' in scope.lower():
+            opt = ldap.SCOPE_BASE
+        elif 'onelevel' in scope.lower():
+            opt = ldap.SCOPE_ONELEVEL
         else:
-            self._scope = ldap.SCOPE_SUBTREE
-        if use_tls != "True" or "ldaps" in ldap_server:
-            self._use_tls = False
-        else:
-            self._use_tls = True
-        self._search_filter = search_filter
+            opt = ldap.SCOPE_SUBTREE
+        return opt
 
     def authenticate(self, username, password):
-        if self._search_filter:
-            search_filter = self._search_filter % {'username': username}
-        else:
-            search_filter = 'uniqueMember=uid=' + username + ',' + self._base_dn
-        try:
-            ldap.set_option(ldap.OPT_X_TLS_REQUIRE_CERT, ldap.OPT_X_TLS_NEVER)
-            connect = ldap.initialize(self._ldap_server)
-            connect.set_option(ldap.OPT_PROTOCOL_VERSION, 3)
-            if self._use_tls:
-                connect.set_option(ldap.OPT_X_TLS, ldap.OPT_X_TLS_DEMAND)
-                connect.start_tls_s()
-                LOG.debug('using TLS')
-            connect.simple_bind_s("uid=" + username + "," + self._base_dn, password)
-            try:
-                result = connect.search_s(self._group_dn, self._scope, search_filter)
-                if result is None:
-                    LOG.debug('User "%s" doesn\'t exist in group "%s"' % (username, self._group_dn))
-                elif result:
-                    LOG.debug('Authentication for user "%s" successful' % (username))
-                    return True
-                return False
-            except:
-                return False
-            finally:
-                connect.unbind()
-        except ldap.LDAPError as e:
-            LOG.debug('LDAP Error: %s' % (str(e)))
+        """
+        Simple binding to authenticate username/password against the LDAP server.
+        :param username: username to authenticate.
+        :type username: ``str``
+        :param password: password to use with for authentication.
+        :type password: ``str``
+        """
+        connection = self._ldap_connect()
+        if not connection:
             return False
+        try:
+            if self._bind_dn == '' == self._bind_pw:
+                LOG.debug('Attempting to fast bind anonymously.')
+                connection.simple_bind_s()
+                LOG.debug('Connected to LDAP as %s ' % connection.whoami_s())
+            else:
+                LOG.debug('Attempting to fast bind with DN.')
+                if self._bind_dn.find('{username}') != -1:
+                    self._bind_dn = self._bind_dn.format(username=username)
+                if self._bind_pw.find('{password}') != -1:
+                    self._bind_pw = self._bind_pw.format(password=password)
+
+                connection.simple_bind_s(self._bind_dn, self._bind_pw)
+                LOG.debug('Connected to LDAP as %s ' % connection.whoami_s())
+
+            if self._user:
+                # Authenticate username and password.
+                result = self._ldap_search(connection, username, self._user)
+                if len(result) != 1:
+                    LOG.debug('Failed to uniquely identify the user.')
+                    return False
+                user_dn = result[0][0]
+                LOG.debug('DN identified as : %s' % user_dn)
+                try:
+                    user_connection = self._ldap_connect()
+                    user_connection.simple_bind_s(user_dn, password)
+                    LOG.debug('User successfully authenticated as %s ' % connection.whoami_s())
+                except ldap.LDAPError as e:
+                    LOG.debug('LDAP Error: %s' % (str(e)))
+                    return False
+                finally:
+                    user_connection.unbind()
+
+            if self._group:
+                # Confirm the user is a member of a given group.
+                result = self._ldap_search(connection, username, self._group)
+                if len(result) != 1:
+                    LOG.debug('Unable to find %s in the group.' % username)
+                    return False
+
+        except ldap.LDAPError as e:
+            LOG.debug('(authenticate) LDAP Error: %s : Type %s' % (str(e), type(e)))
+            return False
+        finally:
+            connection.unbind()
+            LOG.debug('LDAP connection closed')
+        return True
+
+    def _ldap_connect(self):
+        """
+        Prepare ldap object for binding phase.
+        """
+        try:
+            connection = ldap.initialize(self._ldap_uri)
+            ldap.set_option(ldap.OPT_PROTOCOL_VERSION, 3)
+            if self._use_tls:
+                # Require TLS connection.
+                ldap.set_option(ldap.OPT_X_TLS, ldap.OPT_X_TLS_DEMAND)
+                # Require server certificate but ignore it's validity. (allow self-signed)
+                ldap.set_option(ldap.OPT_X_TLS_REQUIRE_CERT, ldap.OPT_X_TLS_NEVER)
+                connection.start_tls_s()
+                LOG.debug('Connection now using TLS')
+            return connection
+        except ldap.LDAPError as e:
+            LOG.debug('(_ldap_connect) LDAP Error: %s : Type %s' % (str(e), type(e)))
+            return False
+
+    def _ldap_search(self, connection, username, criteria):
+        """
+        Perform a search against the LDAP server using an established connection.
+        :param connection: The established LDAP connection.
+        :type connection: ``LDAPobject``
+        :param username: The username to be used in the search filter.
+        :type username: ``str``
+        :param criteria: A dictionary of search filter parameters.
+                         (base_dn, search_filter, scope, pattern)
+        :type criteria: ``dict``
+        """
+        base_dn = criteria['base_dn']
+        search_filter = criteria['search_filter'].format(username=username)
+        scope = self._scope_to_ldap_option(criteria['scope'])
+
+        LOG.debug('Searching ... %s %s %s' % (base_dn, scope, search_filter))
+        result = connection.search_s(base_dn, scope, search_filter)
+        # Disabled to prevent logging sensitive data.
+        # LOG.debug("RESULT: {}".format(result))
+        return result
 
     def get_user(self, username):
         pass
