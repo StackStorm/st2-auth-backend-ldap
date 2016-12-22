@@ -1,12 +1,11 @@
-# LDAP authentication plugin for StackStorm Community edition
+# LDAP authentication plug-in for StackStorm Community edition
 
 [![Build Status](https://api.travis-ci.org/StackStorm/st2-auth-backend-ldap.svg?branch=master)](https://travis-ci.org/StackStorm/st2-auth-backend-ldap) [![IRC](https://img.shields.io/irc/%23stackstorm.png)](http://webchat.freenode.net/?channels=stackstorm)
 
-The LDAP backend reads credentials and authenticates user against an LDAP server. This backend was originally contributed to st2 repo by [Ruslan Tumarkin](https://github.com/ruslantum) under [PR #1790](https://github.com/StackStorm/st2/pull/1790).
+The LDAP backend reads credentials and authenticates users against an LDAP server. This backend was originally contributed to the st2 repo by [Ruslan Tumarkin](https://github.com/ruslantum) under [PR #1790](https://github.com/StackStorm/st2/pull/1790).
 
-Note:
-
-Currently there are two types of LDAP backends available - community contributed one and one developed and maintained by the StackStorm team. This repository contains a community contributed one.
+####Note:
+There are currently  two types of LDAP backends available - community contributed one and one developed and maintained by the StackStorm team. This repository contains the community contributed one.
 
 Community contributed backend can be installed by anyone and the StackStorm developed one is only available in the enterprise edition (for more information on the enterprise edition, please see https://stackstorm.com/product/#enterprise).
 
@@ -17,31 +16,31 @@ The difference between them is that the one included in the enterprise edition i
 | option        | required | default | description                                                |
 |---------------|----------|---------|------------------------------------------------------------|
 | ldap_uri      | yes      |         | URI of the LDAP server.  Format: `<protocol>://<hostname>[:port] `(Protocol: `ldap` or `ldaps`) |
-| use_tls       | yes      |         | Boolean parameter to set if tls is required. Should be set to *false* using _ldaps_ in the uri. |
-| bind_dn       | no       |         | DN user to bind to LDAP.  If an empty string, an anonymous bind is performed. To use the user supplied username in the bind_dn, use the `{username}` placeholder in string. |
-| bind_pw       | no       |         | DN password.  Use the `{password}` placeholder in the string to use the user supplied password.|
-| user          | no       |         | Search parameters for user authentication. _see user table below_ |
-| group         | no       |         | Search parameters for user's group membership. _see group table below_ |
+| use_tls       | yes      |  False  | Boolean parameter to set if tls is required. Should be set to *false* using _ldaps_ in the uri. |
+| bind_dn       | no       |  ""     | DN user to bind to LDAP.  If an empty string, an anonymous bind is performed. To use the user supplied username in the bind_dn, use the `{username}` placeholder in string. |
+| bind_pw       | no       |  ""     | DN password.  Use the `{password}` placeholder in the string to use the user supplied password.|
+| user          | no       |  None   | Search parameters for user authentication. _see user table below_ |
+| group         | no       |  None   | Search parameters for user's group membership. _see group table below_ |
 
 #### Attributes for user option
 | option        | required | default | description                                                |
 |---------------|----------|---------|------------------------------------------------------------|
-| base_dn       | yes      |         | Base DN on the LDAP server to be used when lookuping up the user account. |
-| search_filter | yes      |         | Should contain the placeholder `{username}` for the username. |
-| scope         | yes      |         | The scope of the search to be performed. Available choices: _base_, _onelevel_, _subtree_ |
+| base_dn       | yes      |   n/a   | Base DN on the LDAP server to be used when looking up the user account. |
+| search_filter | yes      |   n/a   | Should contain the placeholder `{username}` for the username. |
+| scope         | yes      |   n/a  | The scope of the search to be performed. Available choices: _base_, _onelevel_, _subtree_ |
 
 #### Attributes for group option
 | option        | required | default | description                                                |
 |---------------|----------|---------|------------------------------------------------------------|
-| base_dn       | yes      |         | Base DN on the LDAP server to be used when lookuping up the group. |
-| search_filter | yes      |         | Should contain the placeholder `{username}` for the username. |
-| scope         | yes      |         | The scope of the search to be performed. Available choices: _base_, _onelevel_, _subtree_ |
+| base_dn       | yes      |   n/a   | Base DN on the LDAP server to be used when looking up the group. |
+| search_filter | yes      |   n/a   | Should contain the placeholder `{username}` for the username. |
+| scope         | yes      |   n/a   | The scope of the search to be performed. Available choices: _base_, _onelevel_, _subtree_ |
 
 ### Configuration Example
 
 Please refer to the authentication section in the StackStorm [documentation](http://docs.stackstorm.com) for basic setup concept. The following is an example of the auth section in the StackStorm configuration file for the ldap backend.
 
-`[auth]
+```[auth]
 mode = standalone
 backend = ldap
 backend_kwargs = { "ldap_uri": "ldap://ldap.example.com", "use_tls": true, "bind_dn": "cn=user,dc=example,dc=com", "bind_pw": "bind_password", "user": {"base_dn": "ou=users,dc=example,dc=com", "search_filter": "(uid={username})", "scope": "onelevel"}, "group": {"base_dn": "ou=groups,dc=example,dc=com", "search_filter": "(&(cn=st2access)(memberUid={username}))", "scope": "subtree"} }
@@ -52,40 +51,7 @@ key = /path/to/ssl/key/file
 logging = /path/to/st2auth.logging.conf
 api_url = https://myhost.example.com:9101
 debug = False
-`
-
-### Authenticating users against alternative schemas.
-
-There is no one standard way to store user credentials in LDAP.  There are various ways to organise the directory tree and various ways to secure it.  In some cases, the users DN can't be determined with a static configuration and requires a bind DN to locate the user in the database before user authentication can occur.
-
-This authentication backend attempts to be flexible with the way LDAP binding and authentication can be performed, but may not meet all uses cases.
-
-#### ActiveDirectory Examples
-
-Using `sAMAccountName` should be unique in combination with a domain name.<br />
-`"user_dn": "sAMAccountName={{username}}@example.com"`
-
-Using `userPrincipalName` should be unique within a forest.<br />
-`"user_dn": "userPrincipalName={{username}}"`
-
-#### OpenLDAP
-Match unique users in a posix group
-`"uniqueMember=uid=`
-
-### Installation
-
-The procedure mentioned here is suitable for development environments and not recommended for production.
-
- 1. Activate the stackstorm virtual environment.
- `source /<path to stackstorm>/st2/bin/activate`
- 2. Install the LDAP plugin and it's dependencies.
- `pip install git+https://github.com/StackStorm/st2-auth-backend-ldap.git@master#egg=st2_auth_backend_ldap`
- 3. Deactivate virtual environment.
- `deactivate`
- 4. Configure the authentication backend in `/etc/st2/st2.conf` (see example above).
- 5. Restart Stackstorm
- `st2ctl restart`
-
+```
 
 ### Authenticating users against various schemas.
 
@@ -93,7 +59,7 @@ There is no one standard way to store user credentials in LDAP.  There are vario
 
 This authentication backend attempts to be flexible with the way LDAP binding and authentication can be performed, but may not meet all use cases.
 
-#### ActiveDirectory Examples
+#### Active Directory Examples
 
 Using `sAMAccountName` should be unique in combination with a domain name.
 `"bind_dn": "sAMAccountName={username}@example.com", "bind_pw": "{password}"`
@@ -112,7 +78,16 @@ Using bind DN
 
 ### Installation
 
-The procedure mentioned here is suitable for development environments and may not be ideal under production conditions.
+#### Production
+
+1.  Install the LDAP plug-in and its dependencies.
+ `pip install git+https://github.com/<github_account>/st2-auth-backend-ldap.git@master#egg=st2_auth_backend_ldap`
+2. Configure the authentication backend in `/etc/st2/st2.conf` (see example above).
+3. Restart Stackstorm
+ `st2ctl restart`
+
+#### Development
+Suitable for development environments and may not be ideal under production conditions.
 
  1. Activate the stackstorm virtual environment.
  `source /<path to stackstorm>/st2/bin/activate`
@@ -120,19 +95,13 @@ The procedure mentioned here is suitable for development environments and may no
  `pip install --update pip`
  3. Optionally, install dev packages for ldap
  `apt-get install libsasl2-dev python-dev libldap2-dev libssl-dev`
- 4. Install the LDAP plugin and its dependencies.
+ 4. Install the LDAP plug-in and its dependencies.
  `pip install git+https://github.com/<github_account>/st2-auth-backend-ldap.git@master#egg=st2_auth_backend_ldap`
  5. Deactivate virtual environment.
  `deactivate`
  6. Configure the authentication backend in `/etc/st2/st2.conf` (see example above).
  7. Restart Stackstorm
  `st2ctl restart`
-
-Watch out for configuration errors in st2.conf, the auth daemon will silently fail to start if it encounters any errors.
-
-Confirm you can get access with the required information:
-`  apt-get install ldap-utils
-  ldapsearch ....`
 
 
 ## Copyright, License, and Contributors Agreement
