@@ -17,6 +17,7 @@
 import ldap
 import os
 import unittest2
+import mock
 from mockldap import MockLdap
 from st2auth_ldap_backend.ldap_backend import LDAPAuthenticationBackend
 
@@ -223,6 +224,42 @@ class LDAPAuthenticationBackendTestCase(unittest2.TestCase):
         )
         self.assertFalse(result)
 
+    def test_search_with_reference_result(self):
+        # additional result that includes object typed ldap.RES_SEARCH_REFERENCE
+        search_references = [
+            (None, ['ldap://srv.example.com/ou=cyberdyne,dc=example,dc=com']),
+        ]
+
+        # Because the mockldap doesn't treat objects which are type of ldap.RES_SEARCH_REFERENCE,
+        # this case insert reference results with 'side_effect'
+        f_search_s = self.ldapobj.search_s
+        def side_effect(self, *args, **kwargs):
+            return f_search_s(self, *args, **kwargs) + search_references
+        self.ldapobj.search_s = mock.Mock(side_effect=side_effect)
+
+        user = {
+            "base_dn": "ou=users,dc=example,dc=com",
+            "search_filter": "(uid={username})",
+            "scope": "subtree",
+        }
+
+        result = _do_simple_bind('ldap://fakeldap.example.com/', '', '',
+                                 user_search=user, group_search=None,
+                                 username='john_connor', password='HastaLavista')
+
+        self.assertEquals(self.ldapobj.methods_called(),[
+                'initialize',
+                'simple_bind_s',
+                'whoami_s',
+                'search_s',
+                'initialize',
+                'simple_bind_s',
+                'whoami_s',
+                'unbind',
+                'unbind'
+            ]
+        )
+        self.assertTrue(result)
 
 def _do_simple_bind(uri, bind_dn, bind_pw, user_search=None, group_search=None, username=None, password=None):
     backend = LDAPAuthenticationBackend(uri, use_tls=False, bind_dn=bind_dn, bind_pw=bind_pw, user=user_search, group=group_search)

@@ -165,10 +165,13 @@ class LDAPAuthenticationBackend(object):
         scope = self._scope_to_ldap_option(criteria['scope'])
 
         LOG.debug('Searching ... %s %s %s' % (base_dn, scope, search_filter))
-        result = connection.search_s(base_dn, scope, search_filter)
+        results = connection.search_s(base_dn, scope, search_filter)
+
         # Disabled to prevent logging sensitive data.
         # LOG.debug("RESULT: {}".format(result))
-        return result
+
+        # screening the results from objects of ldap.RES_SEARCH_REFERENCE
+        return [x for x in results if x[0]]
 
     def get_user(self, username):
         pass
