@@ -19,6 +19,7 @@ import os
 import unittest2
 import mock
 from mockldap import MockLdap
+from mockldap.recording import RecordedMethod
 from st2auth_ldap_backend.ldap_backend import LDAPAuthenticationBackend
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
@@ -53,6 +54,46 @@ class LDAPAuthenticationBackendTestCase(unittest2.TestCase):
         # Patch ldap.initialize
         self.mockldap.start()
         self.ldapobj = self.mockldap['ldap://fakeldap.example.com/']
+
+        # needs decorator to record calling 'result' method
+        self.mock_referral = []
+        self.ldapobj._result = self.ldapobj.result
+
+        # Note:
+        # These side_effect mocks are stopgap measures until ldapmock module implements
+        # the processing to get entries synchronously at the 'result' method.
+
+        # extending 'result' method of ldapmock module to enables get objects synchronously
+        def side_effect_result(*args, **kwargs):
+            def result(ldapobj, msgid, all):
+                if all:
+                    # normal processing of mockldap
+                    return (ldap.RES_SEARCH_RESULT, self._sync_results)
+                else:
+                    if self._sync_results:
+                        return (ldap.RES_SEARCH_ENTRY, [self._sync_results.pop()])
+                    elif self.mock_referral:
+                        # when mock_referrals are defined, this returns referral object
+                        return (ldap.RES_SEARCH_REFERENCE, [self.mock_referral.pop()])
+                    else:
+                        # the case of test that dereferences referral object
+                        return (ldap.RES_SEARCH_RESULT, None)
+
+            if self._sync_results == None:
+                # get entry objects through the original 'result' method of ldapmock module
+                self._sync_results = self.ldapobj._result(*args, **kwargs)[1]
+                return result(self.ldapobj, *args, **kwargs)
+            else:
+                # call result method through RecordedMethod for tracking method calling of LDAPObject
+                return RecordedMethod(result, self.ldapobj)(*args, **kwargs)
+        self.ldapobj.result = mock.Mock(side_effect=side_effect_result)
+
+        self.ldapobj._search = self.ldapobj.search
+        def side_effect_search(*args, **kwargs):
+            # clear the interal state of test 'result' method
+            self._sync_results = None
+            return self.ldapobj._search(*args, **kwargs)
+        self.ldapobj.search = mock.Mock(side_effect=side_effect_search)
 
     def tearDown(self):
         # Stop patching ldap.initialize and reset state.
@@ -104,7 +145,9 @@ class LDAPAuthenticationBackendTestCase(unittest2.TestCase):
             'initialize',
             'simple_bind_s',
             'whoami_s',
-            'search_s',
+            'search',
+            'result',
+            'result',
             'initialize',
             'simple_bind_s',
             'whoami_s',
@@ -129,7 +172,8 @@ class LDAPAuthenticationBackendTestCase(unittest2.TestCase):
                 'initialize',
                 'simple_bind_s',
                 'whoami_s',
-                'search_s',
+                'search',
+                'result',
                 'unbind'
             ]
         )
@@ -141,16 +185,19 @@ class LDAPAuthenticationBackendTestCase(unittest2.TestCase):
         password = 'bad_password'
         user = {"base_dn": "ou=users,dc=example,dc=com", "search_filter": "(uid={username})", "scope": "onelevel"}
 
-        mock_res = []
+        mock_res_id = 1234
+        mock_res = (ldap.RES_SEARCH_RESULT, None)
 
-        self.ldapobj.search_s.seed(user["base_dn"], ldap.SCOPE_ONELEVEL, user["search_filter"].format(username=username))(mock_res)
+        self.ldapobj._search.seed(user["base_dn"], ldap.SCOPE_ONELEVEL, user["search_filter"].format(username=username))(mock_res_id)
+        self.ldapobj._result.seed(mock_res_id, all=0)(mock_res)
         result = _do_simple_bind('ldap://fakeldap.example.com/', 'cn=manager,dc=example,dc=com', 'ldaptest', user_search=user, group_search=None, username=username, password=password)
 
         self.assertEquals(self.ldapobj.methods_called(), [
                 'initialize',
                 'simple_bind_s',
                 'whoami_s',
-                'search_s',
+                'search',
+                'result',
                 'unbind'
             ]
         )
@@ -161,17 +208,21 @@ class LDAPAuthenticationBackendTestCase(unittest2.TestCase):
         username = 'john_connor'
         password = 'HastaLavista'
         user_dn = 'uid={},ou=users,dc=example,dc=com'.format(username)
-        mock_user_res = (user_dn, LDAPAuthenticationBackendTestCase.directory[user_dn])
+        mock_user_res_id = 1234
+        mock_user_res = (ldap.RES_SEARCH_RESULT, [(user_dn, LDAPAuthenticationBackendTestCase.directory[user_dn])])
 
         groupname = 'resistance'
         group_dn = 'cn={groupname},ou=groups,dc=example,dc=com'.format(groupname=groupname)
-        mock_group_res = (group_dn, LDAPAuthenticationBackendTestCase.directory[group_dn])
+        mock_group_res_id = 9999
+        mock_group_res = (ldap.RES_SEARCH_RESULT, [(group_dn, LDAPAuthenticationBackendTestCase.directory[group_dn])])
 
         user = {"base_dn": "ou=users,dc=example,dc=com", "search_filter": "(uid={username})", "scope": "onelevel"}
         group = {"base_dn": "ou=groups,dc=example,dc=com", "search_filter": "(&(cn=%s)(memberUid={username}))"%groupname, "scope": "subtree"}
 
-        self.ldapobj.search_s.seed(user["base_dn"], ldap.SCOPE_ONELEVEL, user["search_filter"].format(username=username))([mock_user_res])
-        self.ldapobj.search_s.seed(group["base_dn"], ldap.SCOPE_SUBTREE, group["search_filter"].format(username=username))([mock_group_res])
+        self.ldapobj._search.seed(user["base_dn"], ldap.SCOPE_ONELEVEL, user["search_filter"].format(username=username))(mock_user_res_id)
+        self.ldapobj._search.seed(group["base_dn"], ldap.SCOPE_SUBTREE, group["search_filter"].format(username=username))(mock_group_res_id)
+        self.ldapobj._result.seed(mock_user_res_id, all=0)(mock_user_res)
+        self.ldapobj._result.seed(mock_group_res_id, all=0)(mock_group_res)
 
         result = _do_simple_bind('ldap://fakeldap.example.com/', 'cn=manager,dc=example,dc=com', 'ldaptest', user_search=user, group_search=group, username=username, password=password)
 
@@ -179,12 +230,16 @@ class LDAPAuthenticationBackendTestCase(unittest2.TestCase):
                 'initialize',
                 'simple_bind_s',
                 'whoami_s',
-                'search_s',
+                'search',
+                'result',
+                'result',
                 'initialize',
                 'simple_bind_s',
                 'whoami_s',
                 'unbind',
-                'search_s',
+                'search',
+                'result',
+                'result',
                 'unbind'
             ]
         )
@@ -195,17 +250,21 @@ class LDAPAuthenticationBackendTestCase(unittest2.TestCase):
         username = 'john_connor'
         password = 'HastaLavista'
         user_dn = 'uid={},ou=users,dc=example,dc=com'.format(username)
-        mock_user_res = (user_dn, LDAPAuthenticationBackendTestCase.directory[user_dn])
+        mock_user_res_id = 1234
+        mock_user_res = (ldap.RES_SEARCH_RESULT, [(user_dn, LDAPAuthenticationBackendTestCase.directory[user_dn])])
 
         groupname = 'invalid_group'
         group_dn = 'cn={groupname},ou=groups,dc=example,dc=com'.format(groupname=groupname)
-        mock_group_res = []
+        mock_group_res_id = 9999
+        mock_group_res = (ldap.RES_SEARCH_RESULT, None)
 
         user = {"base_dn": "ou=users,dc=example,dc=com", "search_filter": "(uid={username})", "scope": "onelevel"}
         group = {"base_dn": "ou=groups,dc=example,dc=com", "search_filter": "(&(cn=%s)(memberUid={username}))"%groupname, "scope": "subtree"}
 
-        self.ldapobj.search_s.seed(user["base_dn"], ldap.SCOPE_ONELEVEL, user["search_filter"].format(username=username))([mock_user_res])
-        self.ldapobj.search_s.seed(group["base_dn"], ldap.SCOPE_SUBTREE, group["search_filter"].format(username=username))(mock_group_res)
+        self.ldapobj._search.seed(user["base_dn"], ldap.SCOPE_ONELEVEL, user["search_filter"].format(username=username))(mock_user_res_id)
+        self.ldapobj._search.seed(group["base_dn"], ldap.SCOPE_SUBTREE, group["search_filter"].format(username=username))(mock_group_res_id)
+        self.ldapobj._result.seed(mock_user_res_id, all=0)(mock_user_res)
+        self.ldapobj._result.seed(mock_group_res_id, all=0)(mock_group_res)
 
         result = _do_simple_bind('ldap://fakeldap.example.com/', 'cn=manager,dc=example,dc=com', 'ldaptest', user_search=user, group_search=group, username=username, password=password)
 
@@ -213,29 +272,25 @@ class LDAPAuthenticationBackendTestCase(unittest2.TestCase):
                 'initialize',
                 'simple_bind_s',
                 'whoami_s',
-                'search_s',
+                'search',
+                'result',
+                'result',
                 'initialize',
                 'simple_bind_s',
                 'whoami_s',
                 'unbind',
-                'search_s',
+                'search',
+                'result',
                 'unbind'
             ]
         )
         self.assertFalse(result)
 
     def test_search_with_reference_result(self):
-        # additional result that includes object typed ldap.RES_SEARCH_REFERENCE
-        search_references = [
-            (None, ['ldap://srv.example.com/ou=cyberdyne,dc=example,dc=com']),
+        # This is for returning the referral object at calling 'result' method of LDAPObject
+        self.mock_referral = [
+            (None, ['ldap://fakeldap2.example.com/ou=cyberdyne,dc=example,dc=com']),
         ]
-
-        # Because the mockldap doesn't treat objects which are type of ldap.RES_SEARCH_REFERENCE,
-        # this case insert reference results with 'side_effect'
-        f_search_s = self.ldapobj.search_s
-        def side_effect(self, *args, **kwargs):
-            return f_search_s(self, *args, **kwargs) + search_references
-        self.ldapobj.search_s = mock.Mock(side_effect=side_effect)
 
         user = {
             "base_dn": "ou=users,dc=example,dc=com",
@@ -251,11 +306,11 @@ class LDAPAuthenticationBackendTestCase(unittest2.TestCase):
                 'initialize',
                 'simple_bind_s',
                 'whoami_s',
-                'search_s',
-                'initialize',
-                'simple_bind_s',
+                'search',
+                'result',
+                'result',
+                'result',
                 'whoami_s',
-                'unbind',
                 'unbind'
             ]
         )
