@@ -36,7 +36,8 @@ class LDAPAuthenticationBackend(object):
         * Bind Distinguish Name with user lookup.
         * Bind Distinguish Name with user and group lookup.
     """
-    def __init__(self, ldap_uri, use_tls=False, bind_dn='', bind_pw='', user=None, group=None):
+    def __init__(self, ldap_uri, use_tls=False, bind_dn='', bind_pw='', user=None, group=None,
+                 ref_hop_limit=0):
         """
         :param ldap_uri: URL of the LDAP Server. <proto>://<host>[:port]
         :type ldap_uri:  ``str``
@@ -52,6 +53,8 @@ class LDAPAuthenticationBackend(object):
         :param group:    Search parameters used to confirm the user is a member of a given group.
                          (base_dn, search_filter, scope)
         :type group:     ``dict``
+        :param ref_hop_limit:   Maximum referral hop numbers (0 means never search referral objects)
+        :type ref_hop_limit:    ``int``
         """
         self._ldap_uri = ldap_uri
         self._use_tls = use_tls
@@ -59,6 +62,7 @@ class LDAPAuthenticationBackend(object):
         self._bind_pw = bind_pw
         self._user = user
         self._group = group
+        self._ref_hop_limit = ref_hop_limit
 
     def _scope_to_ldap_option(self, scope):
         """
@@ -71,6 +75,66 @@ class LDAPAuthenticationBackend(object):
         else:
             opt = ldap.SCOPE_SUBTREE
         return opt
+
+    def _get_ldap_search_results(self, connection, username, criteria, result_id, current_ref_hop):
+        results = []
+        r_type, r_data = connection.result(result_id, all=0)
+
+        if r_type == ldap.RES_SEARCH_ENTRY:
+            results.append(self._get_ldap_search_entry(r_data))
+
+            _results = self._get_ldap_search_results(connection, username, criteria, result_id,
+                                                     current_ref_hop)
+            # This condition prevents to append empty results.
+            if _results:
+                results.append(_results)
+        elif r_type == ldap.RES_SEARCH_REFERENCE:
+            _results = self._get_ldap_search_referral(r_data, username, criteria, current_ref_hop)
+            if _results:
+                results.append(_results)
+
+            _results = self._get_ldap_search_results(connection, username, criteria, result_id,
+                                                     current_ref_hop)
+            if _results:
+                results.append(_results)
+
+        return results
+
+    def _get_ldap_search_entry(self, response_data):
+        return response_data[0]
+
+    def _get_ldap_search_referral(self, response_data, username, _criteria, current_ref_hop):
+        # extract referral informations (uri and bind_dn)
+        referral_ptrn = re.compile("^(.*/)(.*)$")
+        referral_info = referral_ptrn.match(response_data[0][1][0])
+
+        criteria = _criteria.copy()
+
+        results = []
+        if referral_info and len(referral_info.groups()) == 2:
+            # update connection informations to referral's one
+            self._ldap_uri = referral_info.group(1)
+            criteria['base_dn'] = referral_info.group(2)
+
+            # re-connect referred LDAP server
+            referral_conn = self._ldap_connect()
+
+            if referral_conn:
+                try:
+                    if self._bind_dn == '' == self._bind_pw:
+                        referral_conn.simple_bind_s()
+                    else:
+                        referral_conn.simple_bind_s(self._bind_dn, self._bind_pw)
+
+                    # dereference referral objects
+                    results = self._ldap_search(referral_conn, username, criteria,
+                                                current_ref_hop + 1)
+                except ldap.LDAPError as e:
+                    LOG.debug('LDAP Error: %s' % (str(e)))
+                finally:
+                    referral_conn.unbind()
+
+        return results
 
     def authenticate(self, username, password):
         """
@@ -153,7 +217,7 @@ class LDAPAuthenticationBackend(object):
             LOG.debug('(_ldap_connect) LDAP Error: %s : Type %s' % (str(e), type(e)))
             return False
 
-    def _ldap_search(self, connection, username, criteria):
+    def _ldap_search(self, connection, username, criteria, current_ref_hop=0):
         """
         Perform a search against the LDAP server using an established connection.
         :param connection: The established LDAP connection.
@@ -164,7 +228,11 @@ class LDAPAuthenticationBackend(object):
                          (base_dn, search_filter, scope, pattern)
         :type criteria: ``dict``
         """
-        results = []
+        # checks referral serch hop limit
+        if current_ref_hop > int(self._ref_hop_limit):
+            LOG.warning('Referral hop limit is exceeded (current_ref_hop: %d)' % current_ref_hop)
+            return []
+
         base_dn = criteria['base_dn']
         search_filter = criteria['search_filter'].format(username=username)
         scope = self._scope_to_ldap_option(criteria['scope'])
@@ -172,44 +240,9 @@ class LDAPAuthenticationBackend(object):
         LOG.debug('Searching ... %s %s %s' % (base_dn, scope, search_filter))
 
         result_id = connection.search(base_dn, scope, search_filter)
-        while 1:
-            r_type, r_data = connection.result(result_id, all=0)
 
-            if r_type == ldap.RES_SEARCH_RESULT:
-                break
-            elif r_type == ldap.RES_SEARCH_ENTRY:
-                results.append(r_data[0])
-            elif r_type == ldap.RES_SEARCH_REFERENCE:
-                # extract referral informations (uri and bind_dn)
-                referral_ptrn = re.compile("^(.*/)(.*)$")
-                referral_info = referral_ptrn.match(r_data[0][1][0])
-
-                if referral_info and len(referral_info.groups()) == 2:
-                    # update connection informations to referral's one
-                    self._ldap_uri = referral_info.group(1)
-                    criteria['base_dn'] = referral_info.group(2)
-
-                    # re-connect referred LDAP server
-                    referral_conn = self._ldap_connect()
-                    if referral_conn:
-                        try:
-                            if self._bind_dn == '' == self._bind_pw:
-                                referral_conn.simple_bind_s()
-                            else:
-                                referral_conn.simple_bind_s(self._bind_dn, self._bind_pw)
-
-                            # dereference referral objects
-                            results.extend(self._ldap_search(referral_conn, username, criteria))
-                        except ldap.LDAPError as e:
-                            LOG.debug('LDAP Error: %s' % (str(e)))
-                        finally:
-                            referral_conn.unbind()
-            else:
-                LOG.warning("Unknown type('%s') is appear" % r_type)
-
-        # Disabled to prevent logging sensitive data.
-        # LOG.debug("RESULT: {}".format(result))
-        return results
+        return self._get_ldap_search_results(connection, username, criteria, result_id,
+                                             current_ref_hop)
 
     def get_user(self, username):
         pass
