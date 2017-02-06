@@ -23,6 +23,8 @@ from mockldap.recording import RecordedMethod
 from st2auth_ldap_backend.ldap_backend import LDAPAuthenticationBackend
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+DEFAULT_URI = 'ldap://fakeldap.example.com/'
+
 
 class LDAPAuthenticationBackendTestCase(unittest2.TestCase):
     """
@@ -102,28 +104,28 @@ class LDAPAuthenticationBackendTestCase(unittest2.TestCase):
 
 
     def test_bind_anonymous(self):
-        result = _do_simple_bind('ldap://fakeldap.example.com/', '', '')
+        result = _do_simple_bind('', '')
 
         self.assertEquals(self.ldapobj.methods_called(), ['initialize', 'simple_bind_s', 'whoami_s', 'unbind'])
         self.assertTrue(result)
 
 
     def test_bind_dn_valid(self):
-        result = _do_simple_bind('ldap://fakeldap.example.com/', 'cn=manager,dc=example,dc=com', 'ldaptest')
+        result = _do_simple_bind('cn=manager,dc=example,dc=com', 'ldaptest')
 
         self.assertEquals(self.ldapobj.methods_called(), ['initialize', 'simple_bind_s', 'whoami_s', 'unbind'])
         self.assertTrue(result)
 
 
     def test_bind_dn_invalid_user(self):
-        result = _do_simple_bind('ldap://fakeldap.example.com/', 'uid=invalid_user,ou=users,dc=example,dc=com', 'none')
+        result = _do_simple_bind('uid=invalid_user,ou=users,dc=example,dc=com', 'none')
 
         self.assertEquals(self.ldapobj.methods_called(), ['initialize', 'simple_bind_s', 'unbind'])
         self.assertFalse(result)
 
 
     def test_bind_dn_invalid_password(self):
-        result = _do_simple_bind('ldap://fakeldap.example.com/', 'cn=manager,dc=example,dc=com', 'invalid_password')
+        result = _do_simple_bind('cn=manager,dc=example,dc=com', 'invalid_password')
 
         self.assertEquals(self.ldapobj.methods_called(), ['initialize', 'simple_bind_s', 'unbind'])
         self.assertFalse(result)
@@ -139,7 +141,7 @@ class LDAPAuthenticationBackendTestCase(unittest2.TestCase):
 
         self.ldapobj.search_s.seed(user["base_dn"], ldap.SCOPE_ONELEVEL, user["search_filter"].format(username=username))([mock_res])
 
-        result = _do_simple_bind('ldap://fakeldap.example.com/', 'cn=manager,dc=example,dc=com', 'ldaptest', user_search=user, group_search=None, username=username, password=password)
+        result = _do_simple_bind('cn=manager,dc=example,dc=com', 'ldaptest', user_search=user, group_search=None, username=username, password=password)
 
         self.assertEquals(self.ldapobj.methods_called(), [
             'initialize',
@@ -166,7 +168,7 @@ class LDAPAuthenticationBackendTestCase(unittest2.TestCase):
         mock_res = []
 
         self.ldapobj.search_s.seed(user["base_dn"], ldap.SCOPE_ONELEVEL, user["search_filter"].format(username=username))(mock_res)
-        result = _do_simple_bind('ldap://fakeldap.example.com/', 'cn=manager,dc=example,dc=com', 'ldaptest', user_search=user, group_search=None, username=username, password=password)
+        result = _do_simple_bind('cn=manager,dc=example,dc=com', 'ldaptest', user_search=user, group_search=None, username=username, password=password)
 
         self.assertEquals(self.ldapobj.methods_called(), [
                 'initialize',
@@ -190,7 +192,7 @@ class LDAPAuthenticationBackendTestCase(unittest2.TestCase):
 
         self.ldapobj._search.seed(user["base_dn"], ldap.SCOPE_ONELEVEL, user["search_filter"].format(username=username))(mock_res_id)
         self.ldapobj._result.seed(mock_res_id, all=0)(mock_res)
-        result = _do_simple_bind('ldap://fakeldap.example.com/', 'cn=manager,dc=example,dc=com', 'ldaptest', user_search=user, group_search=None, username=username, password=password)
+        result = _do_simple_bind('cn=manager,dc=example,dc=com', 'ldaptest', user_search=user, group_search=None, username=username, password=password)
 
         self.assertEquals(self.ldapobj.methods_called(), [
                 'initialize',
@@ -224,7 +226,7 @@ class LDAPAuthenticationBackendTestCase(unittest2.TestCase):
         self.ldapobj._result.seed(mock_user_res_id, all=0)(mock_user_res)
         self.ldapobj._result.seed(mock_group_res_id, all=0)(mock_group_res)
 
-        result = _do_simple_bind('ldap://fakeldap.example.com/', 'cn=manager,dc=example,dc=com', 'ldaptest', user_search=user, group_search=group, username=username, password=password)
+        result = _do_simple_bind('cn=manager,dc=example,dc=com', 'ldaptest', user_search=user, group_search=group, username=username, password=password)
 
         self.assertEquals(self.ldapobj.methods_called(), [
                 'initialize',
@@ -266,7 +268,7 @@ class LDAPAuthenticationBackendTestCase(unittest2.TestCase):
         self.ldapobj._result.seed(mock_user_res_id, all=0)(mock_user_res)
         self.ldapobj._result.seed(mock_group_res_id, all=0)(mock_group_res)
 
-        result = _do_simple_bind('ldap://fakeldap.example.com/', 'cn=manager,dc=example,dc=com', 'ldaptest', user_search=user, group_search=group, username=username, password=password)
+        result = _do_simple_bind('cn=manager,dc=example,dc=com', 'ldaptest', user_search=user, group_search=group, username=username, password=password)
 
         self.assertEquals(self.ldapobj.methods_called(), [
                 'initialize',
@@ -298,26 +300,72 @@ class LDAPAuthenticationBackendTestCase(unittest2.TestCase):
             "scope": "subtree",
         }
 
-        result = _do_simple_bind('ldap://fakeldap.example.com/', '', '',
-                                 user_search=user, group_search=None,
-                                 username='john_connor', password='HastaLavista')
+        self._is_maximum_referral_hop_exceeded = False
+        def side_effect(_):
+            self._is_maximum_referral_hop_exceeded = True
 
-        self.assertEquals(self.ldapobj.methods_called(),[
-                'initialize',
-                'simple_bind_s',
-                'whoami_s',
-                'search',
-                'result',
-                'result',
-                'result',
-                'whoami_s',
-                'unbind'
-            ]
-        )
-        self.assertTrue(result)
+        with mock.patch('st2auth_ldap_backend.ldap_backend.LOG.warning', mock.Mock(side_effect=side_effect)):
+            # This is a case that maximum referral hop will be exceeded
+            result = _do_simple_bind('', '',
+                                     user_search=user, group_search=None,
+                                     username='john_connor', password='HastaLavista',
+                                     ref_hop_limit=1)
 
-def _do_simple_bind(uri, bind_dn, bind_pw, user_search=None, group_search=None, username=None, password=None):
-    backend = LDAPAuthenticationBackend(uri, use_tls=False, bind_dn=bind_dn, bind_pw=bind_pw, user=user_search, group=group_search)
+            self.assertEquals(self.ldapobj.methods_called(),[
+                    'initialize',
+                    'simple_bind_s',
+                    'whoami_s',
+                    'search',
+                    'result',
+                    'result',
+                    'result',
+                    'whoami_s',
+                    'unbind'
+                ]
+            )
+            self.assertTrue(result)
+            self.assertFalse(self._is_maximum_referral_hop_exceeded)
+
+    def test_search_with_reference_result_but_exceeded_maximum_referal_hop(self):
+        # This is for returning the referral object at calling 'result' method of LDAPObject
+        self.mock_referral = [
+            (None, ['ldap://fakeldap2.example.com/ou=cyberdyne,dc=example,dc=com']),
+        ]
+
+        user = {
+            "base_dn": "ou=users,dc=example,dc=com",
+            "search_filter": "(uid={username})",
+            "scope": "subtree",
+        }
+
+        self._is_maximum_referral_hop_exceeded = False
+        def side_effect(_):
+            self._is_maximum_referral_hop_exceeded = True
+
+        with mock.patch('st2auth_ldap_backend.ldap_backend.LOG.warning', mock.Mock(side_effect=side_effect)):
+            # This is a case that maximum referral hop will be exceeded
+            result = _do_simple_bind('', '',
+                                     user_search=user, group_search=None,
+                                     username='john_connor', password='HastaLavista',
+                                     ref_hop_limit=0)
+
+            self.assertEquals(self.ldapobj.methods_called(),[
+                    'initialize',
+                    'simple_bind_s',
+                    'whoami_s',
+                    'search',
+                    'result',
+                    'result',
+                    'result',
+                    'whoami_s',
+                    'unbind'
+                ]
+            )
+            self.assertTrue(result)
+            self.assertTrue(self._is_maximum_referral_hop_exceeded)
+
+def _do_simple_bind(bind_dn, bind_pw, uri=DEFAULT_URI, user_search=None, group_search=None, username=None, password=None, ref_hop_limit=0):
+    backend = LDAPAuthenticationBackend(uri, use_tls=False, bind_dn=bind_dn, bind_pw=bind_pw, user=user_search, group=group_search, ref_hop_limit=ref_hop_limit)
     return backend.authenticate(username, password)
 
 
