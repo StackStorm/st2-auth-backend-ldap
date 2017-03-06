@@ -80,10 +80,12 @@ Using bind DN
 
 #### Production
 
-1.  Install the LDAP plug-in and its dependencies.
+1. Activate the stackstorm virtual environment.
+ `source /<path to stackstorm>/st2/bin/activate`
+2.  Install the LDAP plug-in and its dependencies.
  `pip install git+https://github.com/<github_account>/st2-auth-backend-ldap.git@master#egg=st2_auth_backend_ldap`
-2. Configure the authentication backend in `/etc/st2/st2.conf` (see example above).
-3. Restart Stackstorm
+3. Configure the authentication backend in `/etc/st2/st2.conf` (see example above).
+4. Restart Stackstorm
  `st2ctl restart`
 
 #### Development
