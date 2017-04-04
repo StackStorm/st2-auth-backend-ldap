@@ -4,8 +4,8 @@
 
 The LDAP backend reads credentials and authenticates users against an LDAP server. This backend was originally contributed to the st2 repo by [Ruslan Tumarkin](https://github.com/ruslantum) under [PR #1790](https://github.com/StackStorm/st2/pull/1790).
 
-####Note:
-There are currently  two types of LDAP backends available - community contributed one and one developed and maintained by the StackStorm team. This repository contains the community contributed one.
+#### Note:
+There are currently two types of LDAP backends available - community contributed one and one developed and maintained by the StackStorm team. This repository contains the community contributed one.
 
 Community contributed backend can be installed by anyone and the StackStorm developed one is only available in the enterprise edition (for more information on the enterprise edition, please see https://stackstorm.com/product/#enterprise).
 
@@ -80,18 +80,18 @@ Using bind DN
 
 #### Production
 
-1. Activate the stackstorm virtual environment.
+1. Activate the StackStorm virtual environment.
  `source /<path to stackstorm>/st2/bin/activate`
 2.  Install the LDAP plug-in and its dependencies.
  `pip install git+https://github.com/<github_account>/st2-auth-backend-ldap.git@master#egg=st2_auth_backend_ldap`
 3. Configure the authentication backend in `/etc/st2/st2.conf` (see example above).
-4. Restart Stackstorm
+4. Restart StackStorm
  `st2ctl restart`
 
 #### Development
 Suitable for development environments and may not be ideal under production conditions.
 
- 1. Activate the stackstorm virtual environment.
+ 1. Activate the StackStorm virtual environment.
  `source /<path to stackstorm>/st2/bin/activate`
  2. Upgrade pip to the latest version.
  `pip install --update pip`
@@ -102,7 +102,7 @@ Suitable for development environments and may not be ideal under production cond
  5. Deactivate virtual environment.
  `deactivate`
  6. Configure the authentication backend in `/etc/st2/st2.conf` (see example above).
- 7. Restart Stackstorm
+ 7. Restart StackStorm
  `st2ctl restart`
 
 
