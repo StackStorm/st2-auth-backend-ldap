@@ -21,6 +21,7 @@ The difference between them is that the one included in the enterprise edition i
 | bind_pw       | no       |  ""     | DN password.  Use the `{password}` placeholder in the string to use the user supplied password.|
 | user          | no       |  None   | Search parameters for user authentication. _see user table below_ |
 | group         | no       |  None   | Search parameters for user's group membership. _see group table below_ |
+| ref_hop_limit | no       |  0      | The maximum number to refer Referrals recursively |
 
 #### Attributes for user option
 | option        | required | default | description                                                |
