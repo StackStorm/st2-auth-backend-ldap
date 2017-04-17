@@ -15,11 +15,14 @@
 
 
 import ldap
+import logging
 import os
+import re
 import unittest2
 import mock
 from mockldap import MockLdap
 from mockldap.recording import RecordedMethod
+from st2auth_ldap_backend import ldap_backend
 from st2auth_ldap_backend.ldap_backend import LDAPAuthenticationBackend
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
@@ -96,6 +99,29 @@ class LDAPAuthenticationBackendTestCase(unittest2.TestCase):
             self._sync_results = None
             return self.ldapobj._search(*args, **kwargs)
         self.ldapobj.search = mock.Mock(side_effect=side_effect_search)
+
+        class LogHandler(logging.StreamHandler):
+            """Mock logging handler to check log output"""
+
+            def __init__(self, *args, **kwargs):
+                self.reset()
+                logging.StreamHandler.__init__(self, *args, **kwargs)
+
+            def emit(self, record):
+                self.messages[record.levelname.lower()].append(record.getMessage())
+
+            def reset(self):
+                self.messages = {
+                    'debug': [],
+                    'info': [],
+                    'warning': [],
+                    'error': [],
+                    'critical': [],
+                }
+        self.log_handler = LogHandler()
+
+        # set LogHandler for checking log outputs
+        ldap_backend.LOG.addHandler(self.log_handler)
 
     def tearDown(self):
         # Stop patching ldap.initialize and reset state.
@@ -300,31 +326,26 @@ class LDAPAuthenticationBackendTestCase(unittest2.TestCase):
             "scope": "subtree",
         }
 
-        self._is_maximum_referral_hop_exceeded = False
-        def side_effect(_):
-            self._is_maximum_referral_hop_exceeded = True
+        # This is a case that maximum referral hop will be exceeded
+        result = _do_simple_bind('', '',
+                                 user_search=user, group_search=None,
+                                 username='john_connor', password='HastaLavista',
+                                 ref_hop_limit=1)
 
-        with mock.patch('st2auth_ldap_backend.ldap_backend.LOG.warning', mock.Mock(side_effect=side_effect)):
-            # This is a case that maximum referral hop will be exceeded
-            result = _do_simple_bind('', '',
-                                     user_search=user, group_search=None,
-                                     username='john_connor', password='HastaLavista',
-                                     ref_hop_limit=1)
-
-            self.assertEquals(self.ldapobj.methods_called(),[
-                    'initialize',
-                    'simple_bind_s',
-                    'whoami_s',
-                    'search',
-                    'result',
-                    'result',
-                    'result',
-                    'whoami_s',
-                    'unbind'
-                ]
-            )
-            self.assertTrue(result)
-            self.assertFalse(self._is_maximum_referral_hop_exceeded)
+        self.assertEquals(self.ldapobj.methods_called(),[
+                'initialize',
+                'simple_bind_s',
+                'whoami_s',
+                'search',
+                'result',
+                'result',
+                'result',
+                'whoami_s',
+                'unbind'
+            ]
+        )
+        self.assertTrue(result)
+        self.assertEqual(len(self.log_handler.messages['warning']), 0)
 
     def test_search_with_reference_result_but_exceeded_maximum_referal_hop(self):
         # This is for returning the referral object at calling 'result' method of LDAPObject
@@ -338,31 +359,27 @@ class LDAPAuthenticationBackendTestCase(unittest2.TestCase):
             "scope": "subtree",
         }
 
-        self._is_maximum_referral_hop_exceeded = False
-        def side_effect(_):
-            self._is_maximum_referral_hop_exceeded = True
+        result = _do_simple_bind('', '',
+                                 user_search=user, group_search=None,
+                                 username='john_connor', password='HastaLavista',
+                                 ref_hop_limit=0)
 
-        with mock.patch('st2auth_ldap_backend.ldap_backend.LOG.warning', mock.Mock(side_effect=side_effect)):
-            # This is a case that maximum referral hop will be exceeded
-            result = _do_simple_bind('', '',
-                                     user_search=user, group_search=None,
-                                     username='john_connor', password='HastaLavista',
-                                     ref_hop_limit=0)
-
-            self.assertEquals(self.ldapobj.methods_called(),[
-                    'initialize',
-                    'simple_bind_s',
-                    'whoami_s',
-                    'search',
-                    'result',
-                    'result',
-                    'result',
-                    'whoami_s',
-                    'unbind'
-                ]
-            )
-            self.assertTrue(result)
-            self.assertTrue(self._is_maximum_referral_hop_exceeded)
+        self.assertEquals(self.ldapobj.methods_called(),[
+                'initialize',
+                'simple_bind_s',
+                'whoami_s',
+                'search',
+                'result',
+                'result',
+                'result',
+                'whoami_s',
+                'unbind'
+            ]
+        )
+        self.assertTrue(result)
+        self.assertTrue(len(self.log_handler.messages['warning']) > 0)
+        self.assertTrue(re.match(r'^Referral hop limit is exceeded',
+                                 self.log_handler.messages['warning'][0]))
 
 def _do_simple_bind(bind_dn, bind_pw, uri=DEFAULT_URI, user_search=None, group_search=None, username=None, password=None, ref_hop_limit=0):
     backend = LDAPAuthenticationBackend(uri, use_tls=False, bind_dn=bind_dn, bind_pw=bind_pw, user=user_search, group=group_search, ref_hop_limit=ref_hop_limit)
