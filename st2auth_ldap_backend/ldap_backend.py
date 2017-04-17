@@ -77,6 +77,21 @@ class LDAPAuthenticationBackend(object):
         return opt
 
     def _get_ldap_search_results(self, connection, username, criteria, result_id, current_ref_hop):
+        """
+        The '_get_ldap_search_results()' returns the result of parsing a LDAP tree.
+        Internally, this calls 'result' method of the LDAPObject.
+        That method returns a tuple which has following two parameters.
+
+        * r_type: This value can be one of the following three values
+          - RES_SEARCH_ENTRY      : describes that the 'r_type' has a LDAP entry
+          - RES_SEARCH_REFERENCE  : describes that the 'r_type' has a referral information
+          - RES_SEARCH_RESULT     : describes the end of this search
+        * r_data: A contents of search response
+
+        There is a similar metho to parse LDAP tree that is 'search()'.
+        But that method can't get the type information which is described 'r_type' in here.
+        Therefore, this method parses LDAP tree by calling 'result()' method recursively.
+        """
         results = []
         r_type, r_data = connection.result(result_id, all=0)
 
@@ -103,18 +118,18 @@ class LDAPAuthenticationBackend(object):
     def _get_ldap_search_entry(self, response_data):
         return response_data[0]
 
-    def _get_ldap_search_referral(self, response_data, username, _criteria, current_ref_hop):
+    def _get_ldap_search_referral(self, response_data, username, criteria, current_ref_hop):
         # extract referral informations (uri and bind_dn)
         referral_ptrn = re.compile("^(.*/)(.*)$")
         referral_info = referral_ptrn.match(response_data[0][1][0])
 
-        criteria = _criteria.copy()
+        _criteria = criteria.copy()
 
         results = []
         if referral_info and len(referral_info.groups()) == 2:
             # update connection informations to referral's one
             self._ldap_uri = referral_info.group(1)
-            criteria['base_dn'] = referral_info.group(2)
+            _criteria['base_dn'] = referral_info.group(2)
 
             # re-connect referred LDAP server
             referral_conn = self._ldap_connect()
@@ -127,7 +142,7 @@ class LDAPAuthenticationBackend(object):
                         referral_conn.simple_bind_s(self._bind_dn, self._bind_pw)
 
                     # dereference referral objects
-                    results = self._ldap_search(referral_conn, username, criteria,
+                    results = self._ldap_search(referral_conn, username, _criteria,
                                                 current_ref_hop + 1)
                 except ldap.LDAPError as e:
                     LOG.debug('LDAP Error: %s' % (str(e)))
@@ -228,7 +243,7 @@ class LDAPAuthenticationBackend(object):
                          (base_dn, search_filter, scope, pattern)
         :type criteria: ``dict``
         """
-        # checks referral serch hop limit
+        # checks referral search hop limit
         if current_ref_hop > int(self._ref_hop_limit):
             LOG.warning('Referral hop limit is exceeded (current_ref_hop: %d)' % current_ref_hop)
             return []
