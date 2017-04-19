@@ -93,25 +93,20 @@ class LDAPAuthenticationBackend(object):
         Therefore, this method parses LDAP tree by calling 'result()' method recursively.
         """
         results = []
-        r_type, r_data = connection.result(result_id, all=0)
+        r_type = None
 
-        if r_type == ldap.RES_SEARCH_ENTRY:
-            results.append(self._get_ldap_search_entry(r_data))
+        while r_type != ldap.RES_SEARCH_RESULT:
+            r_type, r_data = connection.result(result_id, all=0)
 
-            _results = self._get_ldap_search_results(connection, username, criteria, result_id,
-                                                     current_ref_hop)
-            # This condition prevents to append empty results.
-            if _results:
-                results.append(_results)
-        elif r_type == ldap.RES_SEARCH_REFERENCE:
-            _results = self._get_ldap_search_referral(r_data, username, criteria, current_ref_hop)
-            if _results:
-                results.append(_results)
-
-            _results = self._get_ldap_search_results(connection, username, criteria, result_id,
-                                                     current_ref_hop)
-            if _results:
-                results.append(_results)
+            if r_type == ldap.RES_SEARCH_ENTRY:
+                results.append(self._get_ldap_search_entry(r_data))
+            elif r_type == ldap.RES_SEARCH_REFERENCE:
+                _results = self._get_ldap_search_referral(r_data,
+                                                          username,
+                                                          criteria,
+                                                          current_ref_hop)
+                if _results:
+                    results.append(_results)
 
         return results
 
