@@ -122,6 +122,9 @@ class LDAPAuthenticationBackend(object):
 
         results = []
         if referral_info and len(referral_info.groups()) == 2:
+            # save original '_ldap_uri' parameter
+            _original_ldap_uri = self._ldap_uri
+
             # update connection informations to referral's one
             self._ldap_uri = referral_info.group(1)
             _criteria['base_dn'] = referral_info.group(2)
@@ -143,6 +146,9 @@ class LDAPAuthenticationBackend(object):
                     LOG.debug('LDAP Error: %s' % (str(e)))
                 finally:
                     referral_conn.unbind()
+
+            # retrieve original parameter
+            self._ldap_uri = _original_ldap_uri
 
         return results
 
