@@ -36,8 +36,9 @@ class LDAPAuthenticationBackend(object):
         * Bind Distinguish Name with user lookup.
         * Bind Distinguish Name with user and group lookup.
     """
-    def __init__(self, ldap_uri, use_tls=False, bind_dn='', bind_pw='', user=None, group=None,
-                 ref_hop_limit=0):
+    def __init__(self, ldap_uri, use_tls=False, bind_dn='',
+                 bind_pw='', user=None, group=None,
+                 chase_referrals=True, ref_hop_limit=0):
         """
         :param ldap_uri: URL of the LDAP Server. <proto>://<host>[:port]
         :type ldap_uri:  ``str``
@@ -53,6 +54,9 @@ class LDAPAuthenticationBackend(object):
         :param group:    Search parameters used to confirm the user is a member of a given group.
                          (base_dn, search_filter, scope)
         :type group:     ``dict``
+        :param chase_referrals: Boolean specifying whether to
+                                chase referrals (defaults to true).
+        :type chase_referrals: ``bool``
         :param ref_hop_limit:   Maximum referral hop numbers (0 means never search referral objects)
         :type ref_hop_limit:    ``int``
         """
@@ -62,6 +66,7 @@ class LDAPAuthenticationBackend(object):
         self._bind_pw = bind_pw
         self._user = user
         self._group = group
+        self._chase_referrals = chase_referrals
         self._ref_hop_limit = ref_hop_limit
 
     def _scope_to_ldap_option(self, scope):
@@ -216,11 +221,10 @@ class LDAPAuthenticationBackend(object):
         Prepare ldap object for binding phase.
         """
         try:
-            # set ldap options before connecting LDAP server
-            ldap.set_option(ldap.OPT_PROTOCOL_VERSION, 3)
-            ldap.set_option(ldap.OPT_REFERRALS, ldap.OPT_OFF)
-
             connection = ldap.initialize(self._ldap_uri)
+            connection.set_option(ldap.OPT_PROTOCOL_VERSION, 3)
+            connection.set_option(ldap.OPT_REFERRALS,
+                                  int(self._chase_referrals))
             if self._use_tls:
                 # Require TLS connection.
                 ldap.set_option(ldap.OPT_X_TLS, ldap.OPT_X_TLS_DEMAND)

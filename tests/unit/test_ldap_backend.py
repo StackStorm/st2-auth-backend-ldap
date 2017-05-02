@@ -33,6 +33,8 @@ class LDAPAuthenticationBackendTestCase(unittest2.TestCase):
     """
     A simple test case showing off some of the basic features of mockldap.
     """
+    connect_methods = ['initialize', 'set_option', 'set_option']
+
     directory = {
         'dc=com': {'dc': ['com']},
         'dc=example,dc=com': {'dc': ['example']},
@@ -132,28 +134,28 @@ class LDAPAuthenticationBackendTestCase(unittest2.TestCase):
     def test_bind_anonymous(self):
         result = _do_simple_bind('', '')
 
-        self.assertEquals(self.ldapobj.methods_called(), ['initialize', 'simple_bind_s', 'whoami_s', 'unbind'])
+        self.assertEquals(self.ldapobj.methods_called(), self.connect_methods + ['simple_bind_s', 'whoami_s', 'unbind'])
         self.assertTrue(result)
 
 
     def test_bind_dn_valid(self):
         result = _do_simple_bind('cn=manager,dc=example,dc=com', 'ldaptest')
 
-        self.assertEquals(self.ldapobj.methods_called(), ['initialize', 'simple_bind_s', 'whoami_s', 'unbind'])
+        self.assertEquals(self.ldapobj.methods_called(), self.connect_methods + ['simple_bind_s', 'whoami_s', 'unbind'])
         self.assertTrue(result)
 
 
     def test_bind_dn_invalid_user(self):
         result = _do_simple_bind('uid=invalid_user,ou=users,dc=example,dc=com', 'none')
 
-        self.assertEquals(self.ldapobj.methods_called(), ['initialize', 'simple_bind_s', 'unbind'])
+        self.assertEquals(self.ldapobj.methods_called(), self.connect_methods + ['simple_bind_s', 'unbind'])
         self.assertFalse(result)
 
 
     def test_bind_dn_invalid_password(self):
         result = _do_simple_bind('cn=manager,dc=example,dc=com', 'invalid_password')
 
-        self.assertEquals(self.ldapobj.methods_called(), ['initialize', 'simple_bind_s', 'unbind'])
+        self.assertEquals(self.ldapobj.methods_called(), self.connect_methods + ['simple_bind_s', 'unbind'])
         self.assertFalse(result)
 
     def test_search_valid_username(self):
@@ -169,22 +171,15 @@ class LDAPAuthenticationBackendTestCase(unittest2.TestCase):
 
         result = _do_simple_bind('cn=manager,dc=example,dc=com', 'ldaptest', user_search=user, group_search=None, username=username, password=password)
 
-        self.assertEquals(self.ldapobj.methods_called(), [
-            'initialize',
-            'simple_bind_s',
-            'whoami_s',
-            'search',
-            'result',
-            'result',
-            'initialize',
-            'simple_bind_s',
-            'whoami_s',
-            'unbind',
-            'unbind'
-            ]
+        expected_methods_called = (
+            self.connect_methods +
+            ['simple_bind_s', 'whoami_s', 'search', 'result', 'result'] +
+            self.connect_methods +
+            ['simple_bind_s', 'whoami_s', 'unbind', 'unbind']
         )
-        self.assertTrue(result)
 
+        self.assertEquals(self.ldapobj.methods_called(), expected_methods_called)
+        self.assertTrue(result)
 
     def test_search_invalid_username(self):
         username = 'invalid_username'
@@ -196,17 +191,13 @@ class LDAPAuthenticationBackendTestCase(unittest2.TestCase):
         self.ldapobj.search_s.seed(user["base_dn"], ldap.SCOPE_ONELEVEL, user["search_filter"].format(username=username))(mock_res)
         result = _do_simple_bind('cn=manager,dc=example,dc=com', 'ldaptest', user_search=user, group_search=None, username=username, password=password)
 
-        self.assertEquals(self.ldapobj.methods_called(), [
-                'initialize',
-                'simple_bind_s',
-                'whoami_s',
-                'search',
-                'result',
-                'unbind'
-            ]
+        expected_methods_called = (
+            self.connect_methods +
+            ['simple_bind_s', 'whoami_s', 'search', 'result', 'unbind']
         )
-        self.assertFalse(result)
 
+        self.assertEquals(self.ldapobj.methods_called(), expected_methods_called)
+        self.assertFalse(result)
 
     def test_search_invalid_password(self):
         username = 'sarah_connor'
@@ -220,17 +211,13 @@ class LDAPAuthenticationBackendTestCase(unittest2.TestCase):
         self.ldapobj._result.seed(mock_res_id, all=0)(mock_res)
         result = _do_simple_bind('cn=manager,dc=example,dc=com', 'ldaptest', user_search=user, group_search=None, username=username, password=password)
 
-        self.assertEquals(self.ldapobj.methods_called(), [
-                'initialize',
-                'simple_bind_s',
-                'whoami_s',
-                'search',
-                'result',
-                'unbind'
-            ]
+        expected_methods_called = (
+            self.connect_methods +
+            ['simple_bind_s', 'whoami_s', 'search', 'result', 'unbind']
         )
-        self.assertFalse(result)
 
+        self.assertEquals(self.ldapobj.methods_called(), expected_methods_called)
+        self.assertFalse(result)
 
     def test_search_valid_username_valid_group(self):
         username = 'john_connor'
@@ -254,25 +241,15 @@ class LDAPAuthenticationBackendTestCase(unittest2.TestCase):
 
         result = _do_simple_bind('cn=manager,dc=example,dc=com', 'ldaptest', user_search=user, group_search=group, username=username, password=password)
 
-        self.assertEquals(self.ldapobj.methods_called(), [
-                'initialize',
-                'simple_bind_s',
-                'whoami_s',
-                'search',
-                'result',
-                'result',
-                'initialize',
-                'simple_bind_s',
-                'whoami_s',
-                'unbind',
-                'search',
-                'result',
-                'result',
-                'unbind'
-            ]
+        expected_methods_called = (
+            self.connect_methods +
+            ['simple_bind_s', 'whoami_s', 'search', 'result', 'result'] +
+            self.connect_methods +
+            ['simple_bind_s', 'whoami_s', 'unbind', 'search', 'result', 'result', 'unbind']
         )
-        self.assertTrue(result)
 
+        self.assertEquals(self.ldapobj.methods_called(), expected_methods_called)
+        self.assertTrue(result)
 
     def test_search_valid_username_invalid_group(self):
         username = 'john_connor'
@@ -296,22 +273,14 @@ class LDAPAuthenticationBackendTestCase(unittest2.TestCase):
 
         result = _do_simple_bind('cn=manager,dc=example,dc=com', 'ldaptest', user_search=user, group_search=group, username=username, password=password)
 
-        self.assertEquals(self.ldapobj.methods_called(), [
-                'initialize',
-                'simple_bind_s',
-                'whoami_s',
-                'search',
-                'result',
-                'result',
-                'initialize',
-                'simple_bind_s',
-                'whoami_s',
-                'unbind',
-                'search',
-                'result',
-                'unbind'
-            ]
+        expected_methods_called = (
+            self.connect_methods +
+            ['simple_bind_s', 'whoami_s', 'search', 'result', 'result'] +
+            self.connect_methods + 
+            ['simple_bind_s', 'whoami_s', 'unbind', 'search', 'result', 'unbind']
         )
+
+        self.assertEquals(self.ldapobj.methods_called(), expected_methods_called)
         self.assertFalse(result)
 
     def test_search_with_reference_result(self):
@@ -332,18 +301,14 @@ class LDAPAuthenticationBackendTestCase(unittest2.TestCase):
                                  username='john_connor', password='HastaLavista',
                                  ref_hop_limit=1)
 
-        self.assertEquals(self.ldapobj.methods_called(),[
-                'initialize',
-                'simple_bind_s',
-                'whoami_s',
-                'search',
-                'result',
-                'result',
-                'result',
-                'whoami_s',
-                'unbind'
-            ]
+        expected_methods_called = (
+            self.connect_methods + 
+            ['simple_bind_s', 'whoami_s', 'search', 'result', 'result', 'result'] +
+            self.connect_methods + 
+            ['simple_bind_s', 'whoami_s', 'unbind', 'unbind']
         )
+
+        self.assertEquals(self.ldapobj.methods_called(), expected_methods_called)
         self.assertTrue(result)
         self.assertEqual(len(self.log_handler.messages['warning']), 0)
 
@@ -364,18 +329,14 @@ class LDAPAuthenticationBackendTestCase(unittest2.TestCase):
                                  username='john_connor', password='HastaLavista',
                                  ref_hop_limit=0)
 
-        self.assertEquals(self.ldapobj.methods_called(),[
-                'initialize',
-                'simple_bind_s',
-                'whoami_s',
-                'search',
-                'result',
-                'result',
-                'result',
-                'whoami_s',
-                'unbind'
-            ]
+        expected_methods_called = (
+            self.connect_methods + 
+            ['simple_bind_s', 'whoami_s', 'search', 'result', 'result', 'result'] +
+            self.connect_methods + 
+            ['simple_bind_s', 'whoami_s', 'unbind', 'unbind']
         )
+
+        self.assertEquals(self.ldapobj.methods_called(), expected_methods_called)
         self.assertTrue(result)
         self.assertTrue(len(self.log_handler.messages['warning']) > 0)
         self.assertTrue(re.match(r'^Referral hop limit is exceeded',

@@ -1,5 +1,7 @@
 *.egg-info
+*.pyc
 dist/
 build/
 .tox/
 .eggs/
+.venv/
