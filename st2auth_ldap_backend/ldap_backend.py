@@ -18,6 +18,7 @@
 # pylint: disable=no-member
 
 from __future__ import absolute_import
+import re
 import ldap
 import logging
 LOG = logging.getLogger(__name__)
@@ -37,7 +38,7 @@ class LDAPAuthenticationBackend(object):
     """
     def __init__(self, ldap_uri, use_tls=False, bind_dn='',
                  bind_pw='', user=None, group=None,
-                 chase_referrals=True):
+                 chase_referrals=True, ref_hop_limit=0):
         """
         :param ldap_uri: URL of the LDAP Server. <proto>://<host>[:port]
         :type ldap_uri:  ``str``
@@ -56,6 +57,8 @@ class LDAPAuthenticationBackend(object):
         :param chase_referrals: Boolean specifying whether to
                                 chase referrals (defaults to true).
         :type chase_referrals: ``bool``
+        :param ref_hop_limit:   Maximum referral hop numbers (0 means never search referral objects)
+        :type ref_hop_limit:    ``int``
         """
         self._ldap_uri = ldap_uri
         self._use_tls = use_tls
@@ -64,6 +67,7 @@ class LDAPAuthenticationBackend(object):
         self._user = user
         self._group = group
         self._chase_referrals = chase_referrals
+        self._ref_hop_limit = ref_hop_limit
 
     def _scope_to_ldap_option(self, scope):
         """
@@ -76,6 +80,82 @@ class LDAPAuthenticationBackend(object):
         else:
             opt = ldap.SCOPE_SUBTREE
         return opt
+
+    def _get_ldap_search_results(self, connection, username, criteria, result_id, current_ref_hop):
+        """
+        The '_get_ldap_search_results()' returns the result of parsing a LDAP tree.
+        Internally, this calls 'result' method of the LDAPObject.
+        That method returns a tuple which has following two parameters.
+
+        * r_type: This value can be one of the following three values
+          - RES_SEARCH_ENTRY      : describes that the 'r_type' has a LDAP entry
+          - RES_SEARCH_REFERENCE  : describes that the 'r_type' has a referral information
+          - RES_SEARCH_RESULT     : describes the end of this search
+        * r_data: A contents of search response
+
+        There is a similar metho to parse LDAP tree that is 'search()'.
+        But that method can't get the type information which is described 'r_type' in here.
+        Therefore, this method parses LDAP tree by calling 'result()' method recursively.
+        """
+        results = []
+        r_type = None
+
+        while r_type != ldap.RES_SEARCH_RESULT:
+            r_type, r_data = connection.result(result_id, all=0)
+
+            if r_type == ldap.RES_SEARCH_ENTRY:
+                results.append(self._get_ldap_search_entry(r_data))
+            elif r_type == ldap.RES_SEARCH_REFERENCE:
+                _results = self._get_ldap_search_referral(r_data,
+                                                          username,
+                                                          criteria,
+                                                          current_ref_hop)
+                if _results:
+                    results.append(_results)
+
+        return results
+
+    def _get_ldap_search_entry(self, response_data):
+        return response_data[0]
+
+    def _get_ldap_search_referral(self, response_data, username, criteria, current_ref_hop):
+        # extract referral informations (uri and bind_dn)
+        referral_ptrn = re.compile("^(.*/)(.*)$")
+        referral_info = referral_ptrn.match(response_data[0][1][0])
+
+        _criteria = criteria.copy()
+
+        results = []
+        if referral_info and len(referral_info.groups()) == 2:
+            # save original '_ldap_uri' parameter
+            _original_ldap_uri = self._ldap_uri
+
+            # update connection informations to referral's one
+            self._ldap_uri = referral_info.group(1)
+            _criteria['base_dn'] = referral_info.group(2)
+
+            # re-connect referred LDAP server
+            referral_conn = self._ldap_connect()
+
+            if referral_conn:
+                try:
+                    if self._bind_dn == '' == self._bind_pw:
+                        referral_conn.simple_bind_s()
+                    else:
+                        referral_conn.simple_bind_s(self._bind_dn, self._bind_pw)
+
+                    # dereference referral objects
+                    results = self._ldap_search(referral_conn, username, _criteria,
+                                                current_ref_hop + 1)
+                except ldap.LDAPError as e:
+                    LOG.debug('LDAP Error: %s' % (str(e)))
+                finally:
+                    referral_conn.unbind()
+
+            # retrieve original parameter
+            self._ldap_uri = _original_ldap_uri
+
+        return results
 
     def authenticate(self, username, password):
         """
@@ -157,7 +237,7 @@ class LDAPAuthenticationBackend(object):
             LOG.debug('(_ldap_connect) LDAP Error: %s : Type %s' % (str(e), type(e)))
             return False
 
-    def _ldap_search(self, connection, username, criteria):
+    def _ldap_search(self, connection, username, criteria, current_ref_hop=0):
         """
         Perform a search against the LDAP server using an established connection.
         :param connection: The established LDAP connection.
@@ -168,15 +248,21 @@ class LDAPAuthenticationBackend(object):
                          (base_dn, search_filter, scope, pattern)
         :type criteria: ``dict``
         """
+        # checks referral search hop limit
+        if current_ref_hop > int(self._ref_hop_limit):
+            LOG.warning('Referral hop limit is exceeded (current_ref_hop: %d)' % current_ref_hop)
+            return []
+
         base_dn = criteria['base_dn']
         search_filter = criteria['search_filter'].format(username=username)
         scope = self._scope_to_ldap_option(criteria['scope'])
 
         LOG.debug('Searching ... %s %s %s' % (base_dn, scope, search_filter))
-        result = connection.search_s(base_dn, scope, search_filter)
-        # Disabled to prevent logging sensitive data.
-        # LOG.debug("RESULT: {}".format(result))
-        return result
+
+        result_id = connection.search(base_dn, scope, search_filter)
+
+        return self._get_ldap_search_results(connection, username, criteria, result_id,
+                                             current_ref_hop)
 
     def get_user(self, username):
         pass

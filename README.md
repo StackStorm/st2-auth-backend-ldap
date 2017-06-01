@@ -22,6 +22,7 @@ The difference between them is that the one included in the enterprise edition i
 | user            | no       |  None   | Search parameters for user authentication. _see user table below_ |
 | group           | no       |  None   | Search parameters for user's group membership. _see group table below_ |
 | chase_referrals | no       |  True   | Boolean parameter to set whether to chase referrals. |
+| ref_hop_limit   | no       |  0      | The maximum number to refer Referrals recursively |
 
 #### Attributes for user option
 | option        | required | default | description                                                |
