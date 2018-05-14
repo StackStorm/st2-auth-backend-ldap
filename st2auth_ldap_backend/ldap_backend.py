@@ -105,7 +105,7 @@ class LDAPAuthenticationBackend(object):
 
             if r_type == ldap.RES_SEARCH_ENTRY:
                 results.append(self._get_ldap_search_entry(r_data))
-            elif r_type == ldap.RES_SEARCH_REFERENCE:
+            elif self._chase_referrals and r_type == ldap.RES_SEARCH_REFERENCE:
                 _results = self._get_ldap_search_referral(r_data,
                                                           username,
                                                           criteria,

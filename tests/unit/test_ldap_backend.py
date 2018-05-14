@@ -276,7 +276,7 @@ class LDAPAuthenticationBackendTestCase(unittest2.TestCase):
         expected_methods_called = (
             self.connect_methods +
             ['simple_bind_s', 'whoami_s', 'search', 'result', 'result'] +
-            self.connect_methods + 
+            self.connect_methods +
             ['simple_bind_s', 'whoami_s', 'unbind', 'search', 'result', 'unbind']
         )
 
@@ -302,9 +302,9 @@ class LDAPAuthenticationBackendTestCase(unittest2.TestCase):
                                  ref_hop_limit=1)
 
         expected_methods_called = (
-            self.connect_methods + 
+            self.connect_methods +
             ['simple_bind_s', 'whoami_s', 'search', 'result', 'result', 'result'] +
-            self.connect_methods + 
+            self.connect_methods +
             ['simple_bind_s', 'whoami_s', 'unbind', 'unbind']
         )
 
@@ -330,9 +330,9 @@ class LDAPAuthenticationBackendTestCase(unittest2.TestCase):
                                  ref_hop_limit=0)
 
         expected_methods_called = (
-            self.connect_methods + 
+            self.connect_methods +
             ['simple_bind_s', 'whoami_s', 'search', 'result', 'result', 'result'] +
-            self.connect_methods + 
+            self.connect_methods +
             ['simple_bind_s', 'whoami_s', 'unbind', 'unbind']
         )
 
@@ -342,8 +342,41 @@ class LDAPAuthenticationBackendTestCase(unittest2.TestCase):
         self.assertTrue(re.match(r'^Referral hop limit is exceeded',
                                  self.log_handler.messages['warning'][0]))
 
-def _do_simple_bind(bind_dn, bind_pw, uri=DEFAULT_URI, user_search=None, group_search=None, username=None, password=None, ref_hop_limit=0):
-    backend = LDAPAuthenticationBackend(uri, use_tls=False, bind_dn=bind_dn, bind_pw=bind_pw, user=user_search, group=group_search, ref_hop_limit=ref_hop_limit)
+    @mock.patch('st2auth_ldap_backend.ldap_backend.LDAPAuthenticationBackend._get_ldap_search_referral')
+    def test_search_with_reference_result_but_chase_referrals_false(self, mock_search_referral):
+        # This is for returning the referral object at calling 'result' method of LDAPObject
+        self.mock_referral = [
+            (None, ['ldap://fakeldap2.example.com/ou=cyberdyne,dc=example,dc=com']),
+        ]
+
+        user = {
+            "base_dn": "ou=users,dc=example,dc=com",
+            "search_filter": "(uid={username})",
+            "scope": "subtree",
+        }
+
+        # This is a case that will return a reference, but chase_referrals is False
+        result = _do_simple_bind('', '',
+                                 user_search=user, group_search=None,
+                                 username='john_connor', password='HastaLavista',
+                                 chase_referrals=False)
+
+        expected_methods_called = (
+            self.connect_methods +
+            ['simple_bind_s', 'whoami_s', 'search', 'result', 'result', 'result'] +
+            self.connect_methods +
+            ['simple_bind_s', 'whoami_s', 'unbind', 'unbind']
+        )
+
+        self.assertEquals(self.ldapobj.methods_called(), expected_methods_called)
+        self.assertTrue(result)
+        self.assertEqual(len(self.log_handler.messages['warning']), 0)
+
+        # ensure that the referral code was never called
+        mock_search_referral.assert_not_called()
+
+def _do_simple_bind(bind_dn, bind_pw, uri=DEFAULT_URI, user_search=None, group_search=None, username=None, password=None, ref_hop_limit=0, chase_referrals=True):
+    backend = LDAPAuthenticationBackend(uri, use_tls=False, bind_dn=bind_dn, bind_pw=bind_pw, user=user_search, group=group_search, ref_hop_limit=ref_hop_limit, chase_referrals=chase_referrals)
     return backend.authenticate(username, password)
 
 
