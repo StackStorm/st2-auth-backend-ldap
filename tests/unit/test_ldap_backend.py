@@ -276,7 +276,7 @@ class LDAPAuthenticationBackendTestCase(unittest2.TestCase):
         expected_methods_called = (
             self.connect_methods +
             ['simple_bind_s', 'whoami_s', 'search', 'result', 'result'] +
-            self.connect_methods + 
+            self.connect_methods +
             ['simple_bind_s', 'whoami_s', 'unbind', 'search', 'result', 'unbind']
         )
 
@@ -302,9 +302,9 @@ class LDAPAuthenticationBackendTestCase(unittest2.TestCase):
                                  ref_hop_limit=1)
 
         expected_methods_called = (
-            self.connect_methods + 
+            self.connect_methods +
             ['simple_bind_s', 'whoami_s', 'search', 'result', 'result', 'result'] +
-            self.connect_methods + 
+            self.connect_methods +
             ['simple_bind_s', 'whoami_s', 'unbind', 'unbind']
         )
 
@@ -330,9 +330,9 @@ class LDAPAuthenticationBackendTestCase(unittest2.TestCase):
                                  ref_hop_limit=0)
 
         expected_methods_called = (
-            self.connect_methods + 
+            self.connect_methods +
             ['simple_bind_s', 'whoami_s', 'search', 'result', 'result', 'result'] +
-            self.connect_methods + 
+            self.connect_methods +
             ['simple_bind_s', 'whoami_s', 'unbind', 'unbind']
         )
 
@@ -355,7 +355,7 @@ class LDAPAuthenticationBackendTestCase(unittest2.TestCase):
             "scope": "subtree",
         }
 
-        # This is a case that maximum referral hop will be exceeded
+        # This is a case that will return a reference, but chase_referrals is False
         result = _do_simple_bind('', '',
                                  user_search=user, group_search=None,
                                  username='john_connor', password='HastaLavista',
