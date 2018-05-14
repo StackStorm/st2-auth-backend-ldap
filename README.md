@@ -11,6 +11,17 @@ Community contributed backend can be installed by anyone and the StackStorm deve
 
 The difference between them is that the one included in the enterprise edition is developed, supported, tested, maintained and certified by the StackStorm team and the community contributed one is developed and maintained by the community.
 
+### Requirements
+
+Ubuntu:
+```
+sudo apt-get -y install gcc libldap2-dev
+```
+RHEL/CentOS:
+```
+sudo yum -y install gcc openldap-devel
+```
+
 ### Configuration Options
 
 | option          | required | default | description                                                |
