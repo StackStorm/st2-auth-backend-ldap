@@ -1,11 +1,26 @@
 language: python
 python: 2.7
 sudo: false
-os:
-  - linux
+
 env:
-  - TOX_ENV=lint
-  - TOX_ENV=py27
+  global:
+    - CACHE_NAME=JOB1
+matrix:
+  include:
+    - env: TOX_ENV=lint
+      python: 2.7
+    - env: TOX_ENV=py27
+      python: 2.7
+    - env: TOX_ENV=py36
+      python: 3.6
+
+cache:
+  pip: true
+  directories:
+    - virtualenv/
+    # NOTE: Caching .tox speeds up py3 build for 30-60 seconds, but causes issues when dependencies
+    # are updated so it's disabled
+    #- .tox/
 
 install:
   - pip install tox
