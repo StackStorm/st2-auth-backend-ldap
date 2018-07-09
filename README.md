@@ -53,7 +53,8 @@ sudo yum -y install gcc openldap-devel
 
 Please refer to the authentication section in the StackStorm [documentation](http://docs.stackstorm.com) for basic setup concept. The following is an example of the auth section in the StackStorm configuration file for the ldap backend.
 
-```[auth]
+```ini
+[auth]
 mode = standalone
 backend = ldap
 backend_kwargs = { "ldap_uri": "ldap://ldap.example.com", "use_tls": true, "bind_dn": "cn=user,dc=example,dc=com", "bind_pw": "bind_password", "user": {"base_dn": "ou=users,dc=example,dc=com", "search_filter": "(uid={username})", "scope": "onelevel"}, "group": {"base_dn": "ou=groups,dc=example,dc=com", "search_filter": "(&(cn=st2access)(memberUid={username}))", "scope": "subtree"} }
