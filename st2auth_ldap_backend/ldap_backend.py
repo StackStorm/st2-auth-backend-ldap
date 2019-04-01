@@ -225,6 +225,11 @@ class LDAPAuthenticationBackend(object):
             connection.set_option(ldap.OPT_PROTOCOL_VERSION, 3)
             connection.set_option(ldap.OPT_REFERRALS,
                                   int(self._chase_referrals))
+
+            if self._ldap_uri.startswith('ldaps://'):
+                # Require server certificate but ignore it's validity. (allow self-signed)
+                ldap.set_option(ldap.OPT_X_TLS_REQUIRE_CERT, ldap.OPT_X_TLS_NEVER)
+
             if self._use_tls:
                 # Require TLS connection.
                 ldap.set_option(ldap.OPT_X_TLS, ldap.OPT_X_TLS_DEMAND)

@@ -24,16 +24,16 @@ sudo yum -y install gcc openldap-devel
 
 ### Configuration Options
 
-| option          | required | default | description                                                |
-|-----------------|----------|---------|------------------------------------------------------------|
-| ldap_uri        | yes      |         | URI of the LDAP server.  Format: `<protocol>://<hostname>[:port] `(Protocol: `ldap` or `ldaps`) |
-| use_tls         | yes      |  False  | Boolean parameter to set if tls is required. Should be set to *false* using _ldaps_ in the uri. |
-| bind_dn         | no       |  ""     | DN user to bind to LDAP.  If an empty string, an anonymous bind is performed. To use the user supplied username in the bind_dn, use the `{username}` placeholder in string. |
-| bind_pw         | no       |  ""     | DN password.  Use the `{password}` placeholder in the string to use the user supplied password.|
-| user            | no       |  None   | Search parameters for user authentication. _see user table below_ |
-| group           | no       |  None   | Search parameters for user's group membership. _see group table below_ |
-| chase_referrals | no       |  True   | Boolean parameter to set whether to chase referrals. |
-| ref_hop_limit   | no       |  0      | The maximum number to refer Referrals recursively |
+| option          | required | type    | default | description                                                |
+|-----------------|----------|---------|---------|------------------------------------------------------------|
+| ldap_uri        | yes      | string  |         | URI of the LDAP server.  Format: `<protocol>://<hostname>[:port] `(Protocol: `ldap` or `ldaps`) |
+| use_tls         | yes      | boolean |  false  | Boolean parameter to set if tls is required. This upgrades a plain-text LDAP connection on `tcp/389` to a TLS connection on the same port using the STARTTLS LDAP command. This is the preferred method of encrypting an LDAP connection as `ldaps://` is deprecated. seee [this article](https://www.openldap.org/faq/data/cache/605.html). Should be set to *false* if using _ldaps_ in the uri. |
+| bind_dn         | no       | string  |  ""     | DN user to bind to LDAP.  If an empty string, an anonymous bind is performed. To use the user supplied username in the bind_dn, use the `{username}` placeholder in string. |
+| bind_pw         | no       | string  |  ""     | DN password.  Use the `{password}` placeholder in the string to use the user supplied password.|
+| user            | no       | object  |  null   | Search parameters for user authentication. _see user table below_ |
+| group           | no       | object  |  null   | Search parameters for user's group membership. _see group table below_ |
+| chase_referrals | no       | boolean |  false  | Boolean parameter to set whether to chase referrals. |
+| ref_hop_limit   | no       | integer |  0      | The maximum number to refer Referrals recursively |
 
 #### Attributes for user option
 | option        | required | default | description                                                |
@@ -65,6 +65,20 @@ key = /path/to/ssl/key/file
 logging = /path/to/st2auth.logging.conf
 api_url = https://myhost.example.com:9101
 debug = False
+```
+
+### Configuration Example - Connecting using encryption
+
+LDAP has deprecated the use of `ldaps://` URIs as described in [this article](https://www.openldap.org/faq/data/cache/605.html).
+The proper way to configure this module to connect to a LDAP server using encryption is
+to specify the `ldap_uri` parameter with an `ldap://` URI and then set `"use_tls": true`.
+This will connect to the LDAP server on port `tcp/389` and then use the `STARTTLS` LDAP command
+to upgrade the connection to an encrypted connetion in-place.
+
+Below is an example config with encryption enabled:
+
+``` ini
+backend_kwargs = { "ldap_uri": "ldap://ldap.example.com", "use_tls": true, "bind_dn": "cn=user,dc=example,dc=com", "bind_pw": "bind_password", "user": {"base_dn": "ou=users,dc=example,dc=com", "search_filter": "(uid={username})", "scope": "onelevel"}, "group": {"base_dn": "ou=groups,dc=example,dc=com", "search_filter": "(&(cn=st2access)(memberUid={username}))", "scope": "subtree"} }
 ```
 
 ### Authenticating users against various schemas.
