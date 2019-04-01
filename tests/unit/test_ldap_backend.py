@@ -375,8 +375,57 @@ class LDAPAuthenticationBackendTestCase(unittest2.TestCase):
         # ensure that the referral code was never called
         mock_search_referral.assert_not_called()
 
-def _do_simple_bind(bind_dn, bind_pw, uri=DEFAULT_URI, user_search=None, group_search=None, username=None, password=None, ref_hop_limit=0, chase_referrals=True):
-    backend = LDAPAuthenticationBackend(uri, use_tls=False, bind_dn=bind_dn, bind_pw=bind_pw, user=user_search, group=group_search, ref_hop_limit=ref_hop_limit, chase_referrals=chase_referrals)
+    def test_ldap_connect(self):
+        try:
+            ldapobj = self.mockldap['ldap://testserver.domain.tld']
+            result = _do_simple_bind('cn=manager,dc=example,dc=com', 'ldaptest',
+                                     uri='ldap://testserver.domain.tld')
+
+            self.assertEquals(ldapobj.methods_called(),
+                              self.connect_methods + ['simple_bind_s', 'whoami_s', 'unbind'])
+            self.assertTrue(result)
+        finally:
+            del ldapobj
+
+    @mock.patch('st2auth_ldap_backend.ldap_backend.ldap.set_option')
+    def test_ldap_connect_ldap_start_tls(self, mock_set_option):
+        try:
+            ldapobj = self.mockldap['ldap://testserver.domain.tld']
+            result = _do_simple_bind('cn=manager,dc=example,dc=com', 'ldaptest',
+                                     uri='ldap://testserver.domain.tld',
+                                     use_tls=True)
+
+            self.assertEquals(ldapobj.methods_called(),
+                              self.connect_methods + ['start_tls_s',
+                                                      'simple_bind_s', 'whoami_s', 'unbind'])
+            mock_set_option.assert_has_calls(
+                [
+                    mock.call(ldap.OPT_X_TLS, ldap.OPT_X_TLS_DEMAND),
+                    mock.call(ldap.OPT_X_TLS_REQUIRE_CERT, ldap.OPT_X_TLS_NEVER),
+                ])
+            self.assertTrue(result)
+        finally:
+            del ldapobj
+
+    @mock.patch('st2auth_ldap_backend.ldap_backend.ldap.set_option')
+    def test_ldap_connect_ldaps(self, mock_set_option):
+        try:
+            ldapobj = self.mockldap['ldaps://testserver.domain.tld']
+            result = _do_simple_bind('cn=manager,dc=example,dc=com', 'ldaptest',
+                                     uri='ldaps://testserver.domain.tld')
+
+            self.assertEquals(ldapobj.methods_called(),
+                              self.connect_methods + ['simple_bind_s', 'whoami_s', 'unbind'])
+            mock_set_option.assert_has_calls(
+                [
+                    mock.call(ldap.OPT_X_TLS_REQUIRE_CERT, ldap.OPT_X_TLS_NEVER),
+                ])
+            self.assertTrue(result)
+        finally:
+            del ldapobj
+
+def _do_simple_bind(bind_dn, bind_pw, uri=DEFAULT_URI, user_search=None, group_search=None, username=None, password=None, ref_hop_limit=0, chase_referrals=True, use_tls=False):
+    backend = LDAPAuthenticationBackend(uri, use_tls=use_tls, bind_dn=bind_dn, bind_pw=bind_pw, user=user_search, group=group_search, ref_hop_limit=ref_hop_limit, chase_referrals=chase_referrals)
     return backend.authenticate(username, password)
 
 

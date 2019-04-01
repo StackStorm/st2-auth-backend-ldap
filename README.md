@@ -24,16 +24,16 @@ sudo yum -y install gcc openldap-devel
 
 ### Configuration Options
 
-| option          | required | default | description                                                |
-|-----------------|----------|---------|------------------------------------------------------------|
-| ldap_uri        | yes      |         | URI of the LDAP server.  Format: `<protocol>://<hostname>[:port] `(Protocol: `ldap` or `ldaps`) |
-| use_tls         | yes      |  False  | Boolean parameter to set if tls is required. Should be set to *false* using _ldaps_ in the uri. |
-| bind_dn         | no       |  ""     | DN user to bind to LDAP.  If an empty string, an anonymous bind is performed. To use the user supplied username in the bind_dn, use the `{username}` placeholder in string. |
-| bind_pw         | no       |  ""     | DN password.  Use the `{password}` placeholder in the string to use the user supplied password.|
-| user            | no       |  None   | Search parameters for user authentication. _see user table below_ |
-| group           | no       |  None   | Search parameters for user's group membership. _see group table below_ |
-| chase_referrals | no       |  True   | Boolean parameter to set whether to chase referrals. |
-| ref_hop_limit   | no       |  0      | The maximum number to refer Referrals recursively |
+| option          | required | type    | default | description                                                |
+|-----------------|----------|---------|---------|------------------------------------------------------------|
+| ldap_uri        | yes      | string  |         | URI of the LDAP server.  Format: `<protocol>://<hostname>[:port] `(Protocol: `ldap` or `ldaps`) |
+| use_tls         | yes      | boolean |  false  | Boolean parameter to set if tls is required. This upgrades a plain-text LDAP connection on `tcp/386` to a TLS connection on the same port using the STARTTLS LDAP command. This is the preferred method of encrypting an LDAP connection as `ldaps://` is deprecated. seee [this article](https://www.openldap.org/faq/data/cache/605.html). Should be set to *false* if using _ldaps_ in the uri. |
+| bind_dn         | no       | string  |  ""     | DN user to bind to LDAP.  If an empty string, an anonymous bind is performed. To use the user supplied username in the bind_dn, use the `{username}` placeholder in string. |
+| bind_pw         | no       | string  |  ""     | DN password.  Use the `{password}` placeholder in the string to use the user supplied password.|
+| user            | no       | object  |  None   | Search parameters for user authentication. _see user table below_ |
+| group           | no       | object  |  None   | Search parameters for user's group membership. _see group table below_ |
+| chase_referrals | no       | boolean |  True   | Boolean parameter to set whether to chase referrals. |
+| ref_hop_limit   | no       | integer |  0      | The maximum number to refer Referrals recursively |
 
 #### Attributes for user option
 | option        | required | default | description                                                |
