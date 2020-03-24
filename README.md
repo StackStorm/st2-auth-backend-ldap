@@ -66,6 +66,20 @@ logging = /path/to/st2auth.logging.conf
 api_url = https://myhost.example.com:9101
 debug = False
 ```
+### Configuration Example 2 - restrict access to a specific LDAP AD group.
+```ini
+[auth]
+mode = standalone
+backend = ldap
+backend_kwargs = { "ldap_uri": "ldap://ldap.example.com", "use_tls": true, "bind_dn": "cn=user,dc=example,dc=com", "bind_pw": "bind_password", "user": {"base_dn": "ou=users,dc=example,dc=com", "search_filter": "((sAMAccountName={username})(memberOf=CN=AD-GroupName,OU=Groups,OU=Region,OU=Client,DC=example,DC=com)", "scope": "subtree"} }
+enable = True
+use_ssl = True
+cert = /path/to/ssl/cert/file
+key = /path/to/ssl/key/file
+logging = /path/to/st2auth.logging.conf
+api_url = https://myhost.example.com:9101
+debug = False
+```
 
 ### Configuration Example - Connecting using encryption
 
