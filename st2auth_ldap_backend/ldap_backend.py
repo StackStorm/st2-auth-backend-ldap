@@ -207,14 +207,14 @@ class LDAPAuthenticationBackend(object):
                 if len(result) != 1:
                     LOG.debug('Unable to find %s in the group.' % username)
                     return False
-
+            return True
         except ldap.LDAPError as e:
             LOG.debug('(authenticate) LDAP Error: %s : Type %s' % (str(e), type(e)))
             return False
         finally:
             connection.unbind()
             LOG.debug('LDAP connection closed')
-        return True
+        return False
 
     def _ldap_connect(self):
         """
