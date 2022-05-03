@@ -1,3 +1,9 @@
+> **DEPRECATED!**  
+> As EWC (aka StackStorm Enterprise) was open-sourced, the community-driven repo is deprecated in favor of https://github.com/StackStorm/st2-auth-ldap which is integrated into the `st2` core.
+>
+> If you're using this repository and interested migrating any of the functionality from this plugin, please open a pull request in the [st2-auth-ldap](https://github.com/StackStorm/st2-auth-ldap) repository instead.
+
+
 # LDAP authentication plug-in for StackStorm Community edition
 
 [![Build Status](https://api.travis-ci.org/StackStorm/st2-auth-backend-ldap.svg?branch=master)](https://travis-ci.org/StackStorm/st2-auth-backend-ldap) [![IRC](https://img.shields.io/irc/%23stackstorm.png)](http://webchat.freenode.net/?channels=stackstorm)
